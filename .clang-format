@@ -1,2 +1,7 @@
-BasedOnStyle: LLVM
-ColumnLimit: 120
+/*
+ * Project: IFJ26
+ * Authors: Daniel Roth (xrothda00)
+ * Description: code format
+ */
+
+BasedOnStyle : LLVM ColumnLimit : 120
