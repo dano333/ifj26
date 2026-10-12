@@ -1,3 +1,9 @@
+/*
+ * Project: IFJ26
+ * Authors: Daniel Roth (xrothda00)
+ * Description: makefile for the project
+*/
+
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -g -MMD -MP
 
