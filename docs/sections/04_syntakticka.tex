@@ -1,0 +1,62 @@
+\section{Syntaktická analýza a LL gramatika}
+Syntaktická analýza je založená na rekurzívnom sestupe podľa nižšie uvedenej kompletnej LL gramatiky.
+TODO
+
+\small
+\noindent
+\begin{longtable}{p{0.5cm} p{3.0cm} p{6.2cm} p{3.8cm}}
+\toprule
+\textbf{Č.} & \textbf{Neterminál} & \textbf{Pravidlo (pravá strana)} & \textbf{Stručný popis} \\
+\midrule
+\endhead
+
+\bottomrule
+\endfoot
+
+1 & $\langle\text{PROLOG}\rangle$ & $\rightarrow$ import id. * EOL $\langle\text{F\_List}\rangle$ EOF & Začiatok programu: import a zoznam definícií funkcií. \\
+2 & $\langle\text{F\_List}\rangle$ & $\rightarrow$ $\langle\text{F\_def}\rangle$ $\langle\text{F\_List}\rangle$ & Zoznam pokračuje ďalšou definíciou funkcie. \\
+3 & $\langle\text{F\_List}\rangle$ & $\rightarrow$ $\varepsilon$ & Ukončenie zoznamu funkcií. \\
+4 & $\langle\text{F\_def}\rangle$ & $\rightarrow$ $\langle\text{ANOTACIA}\rangle$ def id ($\langle\text{PARAMETER}\rangle$) $\langle\text{D\_TYPE}\rangle$ = $\langle\text{F\_BODY\_END}\rangle$ & Definícia funkcie s voliteľnou anotáciou, parametrami a návratovým typom. \\
+5 & $\langle\text{F\_BODY\_END}\rangle$ & $\rightarrow$ EOL INDENT $\langle\text{F\_BODY}\rangle$ DEDENT & Viacriadkové telo funkcie v odsadenom bloku. \\
+6 & $\langle\text{F\_BODY\_END}\rangle$ & $\rightarrow$ $\langle\text{VAL}\rangle$ EOL & Jednoriadkové telo funkcie tvorené hodnotou. \\
+7 & $\langle\text{D\_TYPE}\rangle$ & $\rightarrow$ : $\langle\text{TYPE}\rangle$ & Uvedenie návratového alebo deklarovaného typu. \\
+8 & $\langle\text{D\_TYPE}\rangle$ & $\rightarrow$ $\varepsilon$ & Typ nie je explicitne uvedený. \\
+9 & $\langle\text{TYPE}\rangle$ & $\rightarrow$ Int & Typ Int. \\
+10 & $\langle\text{TYPE}\rangle$ & $\rightarrow$ Double & Typ Double. \\
+11 & $\langle\text{TYPE}\rangle$ & $\rightarrow$ String & Typ String. \\
+12 & $\langle\text{TYPE}\rangle$ & $\rightarrow$ Unit & Typ Unit. \\
+13 & $\langle\text{PARAMETER}\rangle$ & $\rightarrow$ id: $\langle\text{TYPE}\rangle$ $\langle\text{PARAM\_NEXT}\rangle$ & Zoznam parametrov začína typovaným parametrom. \\
+14 & $\langle\text{PARAMETER}\rangle$ & $\rightarrow$ $\varepsilon$ & Funkcia nemá parametre. \\
+15 & $\langle\text{PARAM\_NEXT}\rangle$ & $\rightarrow$ , id: $\langle\text{TYPE}\rangle$ $\langle\text{PARAM\_NEXT}\rangle$ & Ďalší typovaný parameter oddelený čiarkou. \\
+16 & $\langle\text{PARAM\_NEXT}\rangle$ & $\rightarrow$ $\varepsilon$ & Ukončenie zoznamu parametrov. \\
+17 & $\langle\text{ANOTACIA}\rangle$ & $\rightarrow$ @main $\langle\text{NEW\_LINE}\rangle$ & Označenie hlavnej funkcie pomocou @main. \\
+18 & $\langle\text{ANOTACIA}\rangle$ & $\rightarrow$ $\varepsilon$ & Funkcia bez anotácie. \\
+19 & $\langle\text{NEW\_LINE}\rangle$ & $\rightarrow$ EOL & Nový riadok za anotáciou. \\
+20 & $\langle\text{NEW\_LINE}\rangle$ & $\rightarrow$ $\varepsilon$ & Anotácia môže byť bez samostatného nového riadku. \\
+21 & $\langle\text{F\_BODY}\rangle$ & $\rightarrow$ $\langle\text{STMT}\rangle$ $\langle\text{STMT\_NEXT}\rangle$ & Telo funkcie začína príkazom a môže pokračovať ďalšími. \\
+22 & $\langle\text{STMT\_NEXT}\rangle$ & $\rightarrow$ $\langle\text{STMT}\rangle$ $\langle\text{STMT\_NEXT}\rangle$ & Pokračovanie tela ďalším príkazom. \\
+23 & $\langle\text{STMT\_NEXT}\rangle$ & $\rightarrow$ $\varepsilon$ & Ukončenie postupnosti príkazov. \\
+24 & $\langle\text{STMT}\rangle$ & $\rightarrow$ val id $\langle\text{D\_TYPE}\rangle$ = $\langle\text{VAL}\rangle$ EOL & Deklarácia nemennej premennej val. \\
+25 & $\langle\text{STMT}\rangle$ & $\rightarrow$ var id $\langle\text{D\_TYPE}\rangle$ = $\langle\text{VAL}\rangle$ EOL & Deklarácia premennej var. \\
+26 & $\langle\text{STMT}\rangle$ & $\rightarrow$ while $\langle\text{EXP}\rangle$ do EOL INDENT $\langle\text{F\_BODY}\rangle$ DEDENT & Cyklus while s odsadeným telom. \\
+27 & $\langle\text{STMT}\rangle$ & $\rightarrow$ if $\langle\text{EXP}\rangle$ then EOL INDENT $\langle\text{F\_BODY}\rangle$ DEDENT else EOL INDENT $\langle\text{F\_BODY}\rangle$ DEDENT & Podmienka if-else s odsadeným telom oboch vetiev. \\
+28 & $\langle\text{STMT}\rangle$ & $\rightarrow$ return $\langle\text{RET\_VAL}\rangle$ & Príkaz návratu z funkcie. \\
+29 & $\langle\text{RET\_VAL}\rangle$ & $\rightarrow$ $\langle\text{VAL}\rangle$ EOL & Návrat z funkcie s hodnotou. \\
+30 & $\langle\text{RET\_VAL}\rangle$ & $\rightarrow$ EOL & Návrat bez uvedenej hodnoty. \\
+31 & $\langle\text{STMT}\rangle$ & $\rightarrow$ id $\langle\text{DEC}\rangle$ EOL & Príkaz začínajúci identifikátorom: priradenie alebo volanie. \\
+32 & $\langle\text{DEC}\rangle$ & $\rightarrow$ = $\langle\text{VAL}\rangle$ & Priradenie hodnoty do premennej. \\
+33 & $\langle\text{DEC}\rangle$ & $\rightarrow$ ($\langle\text{ARG}\rangle$) & Volanie funkcie s argumentmi. \\
+34 & $\langle\text{ARG}\rangle$ & $\rightarrow$ $\langle\text{TERM}\rangle$ $\langle\text{ARG\_NEXT}\rangle$ & Zoznam argumentov začína termom. \\
+35 & $\langle\text{ARG}\rangle$ & $\rightarrow$ $\varepsilon$ & Volanie bez argumentov. \\
+36 & $\langle\text{ARG\_NEXT}\rangle$ & $\rightarrow$ , $\langle\text{TERM}\rangle$ $\langle\text{ARG\_NEXT}\rangle$ & Ďalší argument oddelený čiarkou. \\
+37 & $\langle\text{ARG\_NEXT}\rangle$ & $\rightarrow$ $\varepsilon$ & Ukončenie zoznamu argumentov. \\
+38 & $\langle\text{TERM}\rangle$ & $\rightarrow$ id & Identifikátor ako term. \\
+39 & $\langle\text{TERM}\rangle$ & $\rightarrow$ string & Reťazcový literál ako term. \\
+40 & $\langle\text{TERM}\rangle$ & $\rightarrow$ int & Celé číslo ako term. \\
+41 & $\langle\text{TERM}\rangle$ & $\rightarrow$ double & Desatinné číslo ako term. \\
+42 & $\langle\text{TERM}\rangle$ & $\rightarrow$ () & Prázdne zátvorky ako term. \\
+43 & $\langle\text{VAL}\rangle$ & $\rightarrow$ $\langle\text{EXP}\rangle$ & Hodnota vytvorená z výrazu. \\
+44 & $\langle\text{VAL}\rangle$ & $\rightarrow$ id($\langle\text{ARG}\rangle$) & Hodnota vytvorená volaním funkcie. \\
+45 & $\langle\text{STMT}\rangle$ & $\rightarrow$ $\langle\text{EXP}\rangle$ EOL & Výraz ukončený novým riadkom ako príkaz. \\
+\end{longtable}
+\normalsize
