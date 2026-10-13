@@ -1,0 +1,53 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[slovak]{babel}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{amsmath}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  xleftmargin=0pt,
+}
+
+\begin{document}
+
+% --- TITLE / HEADER BLOCK ---
+\begin{center}
+    {\LARGE \textbf{IFJ26 Projekt: Dokumentácia}} \\[0.5em]
+    {\large \textbf{Varianta:} TRP-izp}
+\end{center}
+
+\vspace{1em}
+
+\noindent\textbf{Riešitelia:}
+\begin{itemize}
+    \item Jakub Krčmárik -- xkrcma00, č. o. 281753 (25\%)
+    \item David Pavlištík -- xpavlid00, č. o. 282541 (25\%)
+    \item \textbf{Daniel Roth} (vedúci) -- xrothda00, č. o. 282205 (25\%)
+    \item Nazar Zhyla -- xzhylan00, č. o. 282076 (25\%)
+\end{itemize}
+
+\noindent\textbf{Implementované rozšírenia:} Žiadne \\
+\noindent\textbf{Git repozitár:} \url{https://github.com/dano333/ifj26}
+
+\vspace{1.5em}
+\hrule
+\vspace{1.5em}
+
+% --- IMPORT SECTIONS ---
+\input{sections/01_rozdelenie}
+\input{sections/02_architektura}
+\input{sections/03_lexikalna}
+\input{sections/04_syntakticka}
+\input{sections/05_moduly}
+\input{sections/06_footer}
+
+\end{document}
