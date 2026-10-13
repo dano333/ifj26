@@ -1,0 +1,6 @@
+{
+    "explorer.fileNesting.patterns": {
+        "Makefile": ".clang-format,.editorconfig",
+        "flake.nix": "flake.lock"
+    }
+}
