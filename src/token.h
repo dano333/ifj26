@@ -4,91 +4,90 @@
  * Description: tokens description
  */
 
- #include<stdbool.h>
+#include <stdbool.h>
 
- #ifndef TOKEN_H
- #define TOKEN_H
+#ifndef TOKEN_H
+#define TOKEN_H
 
- typedef enum {
-    /*keywords*/
-    TOKEN_KW_DEF, // def
-    TOKEN_KW_DO, // do
-    TOKEN_KW_DOUBLE, // Double
-    TOKEN_KW_ELSE, // else
-    TOKEN_KW_IF, // if
-    TOKEN_KW_IMPORT, // import
-    TOKEN_KW_INT, // Int
-    TOKEN_KW_RETURN, // return
-    TOKEN_KW_STRING, // String
-    TOKEN_KW_THEN, // then
-    TOKEN_KW_UNIT, // Unit
-    TOKEN_KW_VAL, // val
-    TOKEN_KW_VAR, // var
-    TOKEN_KW_WHILE, // while
-    TOKEN_KW_BOOLEAN, // Boolean
-    TOKEN_KW_CASE, // case
-    TOKEN_KW_CLASS, // class
-    TOKEN_KW_EXTENSION, // extension
-    TOKEN_KW_FOR, // for
-    TOKEN_KW_LIST, // List
-    TOKEN_KW_MATCH, // match
-    TOKEN_KW_TYPE, // type
+typedef enum {
+	/*keywords*/
+	TOKEN_KW_DEF,       // def
+	TOKEN_KW_DO,        // do
+	TOKEN_KW_DOUBLE,    // Double
+	TOKEN_KW_ELSE,      // else
+	TOKEN_KW_IF,        // if
+	TOKEN_KW_IMPORT,    // import
+	TOKEN_KW_INT,       // Int
+	TOKEN_KW_RETURN,    // return
+	TOKEN_KW_STRING,    // String
+	TOKEN_KW_THEN,      // then
+	TOKEN_KW_UNIT,      // Unit
+	TOKEN_KW_VAL,       // val
+	TOKEN_KW_VAR,       // var
+	TOKEN_KW_WHILE,     // while
+	TOKEN_KW_BOOLEAN,   // Boolean
+	TOKEN_KW_CASE,      // case
+	TOKEN_KW_CLASS,     // class
+	TOKEN_KW_EXTENSION, // extension
+	TOKEN_KW_FOR,       // for
+	TOKEN_KW_LIST,      // List
+	TOKEN_KW_MATCH,     // match
+	TOKEN_KW_TYPE,      // type
 
-    /*operators*/
-    TOKEN_OP_ASSIGN, // =
-    TOKEN_OP_PLUS, // +
-    TOKEN_OP_MINUS, // -
-    TOKEN_OP_MUL, // *
-    TOKEN_OP_DIV, // /
-    TOKEN_OP_NOT, // !
-    TOKEN_OP_AND, // &&
-    TOKEN_OP_OR, // ||
+	/*operators*/
+	TOKEN_OP_ASSIGN, // =
+	TOKEN_OP_PLUS,   // +
+	TOKEN_OP_MINUS,  // -
+	TOKEN_OP_MUL,    // *
+	TOKEN_OP_DIV,    // /
+	TOKEN_OP_NOT,    // !
+	TOKEN_OP_AND,    // &&
+	TOKEN_OP_OR,     // ||
 
-    /*comparing*/
-    TOKEN_COM_NE, // !=
-    TOKEN_COM_EQ, // ==
-    TOKEN_COM_LT, // <
-    TOKEN_COM_LE, // <=
-    TOKEN_COM_GT, // >
-    TOKEN_COM_GE, // >=
+	/*comparing*/
+	TOKEN_COM_NE, // !=
+	TOKEN_COM_EQ, // ==
+	TOKEN_COM_LT, // <
+	TOKEN_COM_LE, // <=
+	TOKEN_COM_GT, // >
+	TOKEN_COM_GE, // >=
 
-    /*end of*/
-    TOKEN_EOL, // EOL
-    TOKEN_EOF, // EOF
+	/*end of*/
+	TOKEN_EOL, // EOL
+	TOKEN_EOF, // EOF
 
-    /*separators*/
-    TOKEN_SE_LPAREN, // (
-    TOKEN_SE_RPAREN, // )
-    TOKEN_SE_COMMA, // ,
-    TOKEN_SE_DOT, //.
-    TOKEN_SE_COLON, // :
-    TOKEN_SE_SEMICOLON, // ;
-    TOKEN_SE_AT, // @
-    TOKEN_SE_LARROW, // <-
-    
-    /*identifiers*/
-    TOKEN_ID_IDENT, // identifier
-    
-    /*literals*/
-    TOKEN_LIT_INT, // Int literal
-    TOKEN_LIT_DOUBLE, // Double literal
-    TOKEN_LIT_STRING, // String literal
-    TOKEN_LIT_BOOL, // Bool literal
+	/*separators*/
+	TOKEN_SE_LPAREN,    // (
+	TOKEN_SE_RPAREN,    // )
+	TOKEN_SE_COMMA,     // ,
+	TOKEN_SE_DOT,       //.
+	TOKEN_SE_COLON,     // :
+	TOKEN_SE_SEMICOLON, // ;
+	TOKEN_SE_AT,        // @
+	TOKEN_SE_LARROW,    // <-
 
- } TokenType;
+	/*identifiers*/
+	TOKEN_ID_IDENT, // identifier
 
- typedef struct {
-    TokenType type;
-    union {
-        int int_value;
-        double double_value;
-        bool bool_value;
-        // finish text
-    } value;
-    // position for errors
-    int line;
-    int column;
+	/*literals*/
+	TOKEN_LIT_INT,    // Int literal
+	TOKEN_LIT_DOUBLE, // Double literal
+	TOKEN_LIT_STRING, // String literal
+	TOKEN_LIT_BOOL,   // Bool literal
 
- } Token;
- 
- #endif
+} TokenType;
+
+typedef struct {
+	TokenType type;
+	union {
+		int int_value;
+		double double_value;
+		bool bool_value;
+		// finish text
+	} value;
+	// position for errors
+	int line;
+	int column;
+} Token;
+
+#endif
