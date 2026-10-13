@@ -1,0 +1,21 @@
+name: Code Formatting Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  format-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Run formatting check via Makefile
+        run: |
+          nix develop --command make check
