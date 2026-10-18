@@ -9,6 +9,8 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
+#include "string_buffer.h"
+
 typedef enum {
 	/*keywords*/
 	TOKEN_KW_DEF,       // def
@@ -73,7 +75,8 @@ typedef enum {
 	TOKEN_LIT_INT,    // Int literal
 	TOKEN_LIT_DOUBLE, // Double literal
 	TOKEN_LIT_STRING, // String literal
-	TOKEN_LIT_BOOL,   // Bool literal
+	TOKEN_LIT_TRUE,   // True
+	TOKEN_LIT_FALSE,  // False
 
 } TokenType;
 
@@ -82,8 +85,7 @@ typedef struct {
 	union {
 		int int_value;
 		double double_value;
-		bool bool_value;
-		// finish text
+		string *string_value;
 	} value;
 	// position for errors
 	int line;
