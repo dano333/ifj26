@@ -4,8 +4,6 @@
  * Description: tokens description
  */
 
-#include <stdbool.h>
-
 #ifndef TOKEN_H
 #define TOKEN_H
 
@@ -35,6 +33,8 @@ typedef enum {
 	TOKEN_KW_LIST,      // List
 	TOKEN_KW_MATCH,     // match
 	TOKEN_KW_TYPE,      // type
+	TOKEN_KW_TRUE,      // true
+	TOKEN_KW_FALSE,     // false
 
 	/*operators*/
 	TOKEN_OP_ASSIGN, // =
@@ -55,14 +55,16 @@ typedef enum {
 	TOKEN_COM_GE, // >=
 
 	/*end of*/
-	TOKEN_EOL, // EOL
-	TOKEN_EOF, // EOF
+	TOKEN_EOL,    // EOL
+	TOKEN_EOF,    // EOF
+	TOKEN_INDENT, // tabulator section
+	TOKEN_DEDENT, // end of tabulator section
 
 	/*separators*/
 	TOKEN_SE_LPAREN,    // (
 	TOKEN_SE_RPAREN,    // )
 	TOKEN_SE_COMMA,     // ,
-	TOKEN_SE_DOT,       //.
+	TOKEN_SE_DOT,       // .
 	TOKEN_SE_COLON,     // :
 	TOKEN_SE_SEMICOLON, // ;
 	TOKEN_SE_AT,        // @
@@ -75,8 +77,6 @@ typedef enum {
 	TOKEN_LIT_INT,    // Int literal
 	TOKEN_LIT_DOUBLE, // Double literal
 	TOKEN_LIT_STRING, // String literal
-	TOKEN_LIT_TRUE,   // True
-	TOKEN_LIT_FALSE,  // False
 
 } TokenType;
 
@@ -85,7 +85,7 @@ typedef struct {
 	union {
 		int int_value;
 		double double_value;
-		string *string_value;
+		StringBuffer *string_value; // valid only for one scanner call
 	} value;
 	// position for errors
 	int line;
