@@ -10,12 +10,13 @@
 ErrorCode string_init(StringBuffer *s) {
 	s->length = 0;
 	s->capacity = 10;
-	s->data[0] = '\0';
 
 	s->data = malloc(sizeof(char) * s->capacity);
 	if (s->data == NULL) {
 		return ERR_INTERNAL_COMPILER;
+		s->capacity = 0;
 	}
+	s->data[0] = '\0';
 	return ERR_OK;
 }
 

@@ -8,12 +8,6 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef struct {
-	StringBuffer buffer;
-	int line;
-	int column
-} Scanner;
-
 typedef enum {
 	STATE_START,
 	STATE_DIV,    // /
@@ -24,12 +18,19 @@ typedef enum {
 	STATE_AND,    // &
 	STATE_OR,     // |
 	STATE_IDENT,
+	STATE_COMMENT_1, // //
+	STATE_COMMENT_2, // /*
+	STATE_COMMENT_3, // /* + another /
+	STATE_COMMENT_4, // /*/ + another *
+	STATE_COMMENT_5, // /**
 } ScannerState;
 
 typedef struct {
 	const char *str;
 	TokenType type;
 } Keyword;
+
+int comment_depth = 0; // depth of /* comment
 
 static const Keyword keyword[] = {
     {"def", TOKEN_KW_DEF},   {"do", TOKEN_KW_DO},         {"Double", TOKEN_KW_DOUBLE},
@@ -52,9 +53,20 @@ static TokenType check_for_token(const char *identifier) {
 	return TOKEN_ID_IDENT;
 }
 
-ErrorCode get_token(Token *token) {
+ErrorCode scanner_init(Scanner *scanner) {
+	scanner->column = 1;
+	scanner->line = 1;
+	return string_init(&scanner->buffer);
+}
+
+void scanner_free(Scanner *scanner) {
+	scanner->column = 0;
+	scanner->line = 0;
+	string_free(&scanner->buffer);
+}
+
+ErrorCode get_token(Token *token, Scanner *scanner) {
 	ScannerState state = STATE_START;
-	StringBuffer string_buffer;
 
 	while (1) {
 		int character = getc(stdin);
@@ -128,8 +140,11 @@ ErrorCode get_token(Token *token) {
 
 			else if ((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
 			         character == '_') {
-				string_init(&string_buffer);
-				string_add_char(&string_buffer, character);
+				string_clear(&scanner->buffer);
+				ErrorCode err = string_add_char(&scanner->buffer, character);
+				if (err != ERR_OK) {
+					return ERR_INTERNAL_COMPILER;
+				}
 				state = STATE_IDENT;
 				break;
 			}
@@ -175,8 +190,18 @@ ErrorCode get_token(Token *token) {
 
 		case STATE_DIV: // DOROBIT KOMETARE SEM!!!!
 
-			token->type = TOKEN_OP_DIV;
-			return ERR_OK;
+			if (character == '/') {
+				state = STATE_COMMENT_1;
+				break;
+			} else if (character == '*') {
+				state = STATE_COMMENT_2;
+				comment_depth++;
+				break;
+			} else {
+				token->type = TOKEN_OP_DIV;
+				ungetc(character, stdin);
+				return ERR_OK;
+			}
 
 		case STATE_ASSIGN:
 
@@ -248,15 +273,72 @@ ErrorCode get_token(Token *token) {
 
 			if ((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
 			    (character >= '0' && character <= '9') || character == '_') {
-				string_add_char(&string_buffer, character);
+				ErrorCode err = string_add_char(&scanner->buffer, character);
+				if (err != ERR_OK) {
+					return ERR_INTERNAL_COMPILER;
+				}
 			} else {
 				ungetc(character, stdin);
-				token->type = check_for_token(string_buffer.data);
+				token->type = check_for_token(scanner->buffer.data);
 
 				if (token->type == TOKEN_ID_IDENT) {
-					token->value.string_value = &string_buffer.data;
+					token->value.string_value = &scanner->buffer;
 				}
 				return ERR_OK;
+			}
+			break;
+
+		case STATE_COMMENT_1:
+
+			if (character != '\n' || character != EOF) {
+				state = STATE_COMMENT_1;
+				break;
+			} else {
+				state = STATE_START;
+				break;
+			}
+
+		case STATE_COMMENT_2:
+			if (character == '/') {
+				state = STATE_COMMENT_3;
+				break;
+			} else if (character == EOF) {
+				return ERR_LEXICAL;
+				break;
+			} else if (character == '*') {
+				state = STATE_COMMENT_5;
+				break;
+			} else {
+				state = STATE_COMMENT_2;
+				break;
+			}
+
+		case STATE_COMMENT_3:
+			if (character == '*') {
+				state = STATE_COMMENT_4;
+				break;
+			} else {
+				state = STATE_COMMENT_2;
+				break;
+			}
+
+		case STATE_COMMENT_4:
+			comment_depth--;
+			state = STATE_COMMENT_2;
+			break;
+
+		case STATE_COMMENT_5:
+			if (character == '/' && comment_depth == 1) {
+				// end of comment
+				comment_depth--;
+				break;
+			} else if (character == '/' && comment_depth != 1) {
+				comment_depth--;
+				state = STATE_COMMENT_2;
+				break;
+			} else {
+				state == STATE_COMMENT_2;
+				break;
 			}
 		}
 	}
