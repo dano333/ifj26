@@ -21,16 +21,13 @@ typedef enum {
 	STATE_COMMENT_1, // //
 	STATE_COMMENT_2, // /*
 	STATE_COMMENT_3, // /* + another /
-	STATE_COMMENT_4, // /*/ + another *
-	STATE_COMMENT_5, // /**
+	STATE_COMMENT_4, // /**
 } ScannerState;
 
 typedef struct {
 	const char *str;
 	TokenType type;
 } Keyword;
-
-int comment_depth = 0; // depth of /* comment
 
 static const Keyword keyword[] = {
     {"def", TOKEN_KW_DEF},   {"do", TOKEN_KW_DO},         {"Double", TOKEN_KW_DOUBLE},
@@ -67,6 +64,8 @@ void scanner_free(Scanner *scanner) {
 
 ErrorCode get_token(Token *token, Scanner *scanner) {
 	ScannerState state = STATE_START;
+	int comment_depth = 0; // depth of /* comment
+	int new_line_in_comment = 0;
 
 	while (1) {
 		int character = getc(stdin);
@@ -188,7 +187,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				return ERR_LEXICAL;
 			}
 
-		case STATE_DIV: // DOROBIT KOMETARE SEM!!!!
+		case STATE_DIV:
 
 			if (character == '/') {
 				state = STATE_COMMENT_1;
@@ -275,7 +274,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			    (character >= '0' && character <= '9') || character == '_') {
 				ErrorCode err = string_add_char(&scanner->buffer, character);
 				if (err != ERR_OK) {
-					return ERR_INTERNAL_COMPILER;
+					return err;
 				}
 			} else {
 				ungetc(character, stdin);
@@ -290,31 +289,29 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 
 		case STATE_COMMENT_1:
 
-			if (character != '\n' || character != EOF) {
-				state = STATE_COMMENT_1;
-				break;
+			if (character == '\n') {
+				token->type = TOKEN_EOL;
+				return ERR_OK;
+			} else if (character == EOF) {
+				token->type = TOKEN_EOF;
+				return ERR_OK;
 			} else {
-				state = STATE_START;
+				state = STATE_COMMENT_1;
 				break;
 			}
 
 		case STATE_COMMENT_2:
-			if (character == '/') {
+
+			if (character == '\n') {
+				new_line_in_comment = 1;
+				state = STATE_COMMENT_2;
+				break;
+			} else if (character == '/') {
 				state = STATE_COMMENT_3;
 				break;
 			} else if (character == EOF) {
 				return ERR_LEXICAL;
-				break;
 			} else if (character == '*') {
-				state = STATE_COMMENT_5;
-				break;
-			} else {
-				state = STATE_COMMENT_2;
-				break;
-			}
-
-		case STATE_COMMENT_3:
-			if (character == '*') {
 				state = STATE_COMMENT_4;
 				break;
 			} else {
@@ -322,22 +319,55 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				break;
 			}
 
-		case STATE_COMMENT_4:
-			comment_depth--;
-			state = STATE_COMMENT_2;
-			break;
+		case STATE_COMMENT_3:
 
-		case STATE_COMMENT_5:
+			if (character == '\n') {
+				new_line_in_comment = 1;
+				state = STATE_COMMENT_2;
+				break;
+			} else if (character == '*') {
+				comment_depth++;
+				state = STATE_COMMENT_2;
+				break;
+			} else if (character == '/') {
+				state = STATE_COMMENT_3;
+				break;
+			} else if (character == EOF) {
+				return ERR_LEXICAL;
+			} else {
+				state = STATE_COMMENT_2;
+				break;
+			}
+
+		case STATE_COMMENT_4:
+
 			if (character == '/' && comment_depth == 1) {
 				// end of comment
 				comment_depth--;
-				break;
+
+				if (new_line_in_comment == 1) {
+					token->type = TOKEN_EOL;
+					return ERR_OK;
+				} else {
+					state = STATE_START;
+					break;
+				}
+
 			} else if (character == '/' && comment_depth != 1) {
 				comment_depth--;
 				state = STATE_COMMENT_2;
 				break;
+			} else if (character == '*') {
+				state = STATE_COMMENT_4;
+				break;
+			} else if (character == EOF) {
+				return ERR_LEXICAL;
+			} else if (character == '\n') {
+				new_line_in_comment = 1;
+				state = STATE_COMMENT_2;
+				break;
 			} else {
-				state == STATE_COMMENT_2;
+				state = STATE_COMMENT_2;
 				break;
 			}
 		}
