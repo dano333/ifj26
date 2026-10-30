@@ -18,10 +18,18 @@ typedef enum {
 	STATE_AND,    // &
 	STATE_OR,     // |
 	STATE_IDENT,
-	STATE_COMMENT_1, // //
-	STATE_COMMENT_2, // /*
-	STATE_COMMENT_3, // /* + another /
-	STATE_COMMENT_4, // /**
+	STATE_COMMENT_1,   // //
+	STATE_COMMENT_2,   // /*
+	STATE_COMMENT_3,   // /* + another /
+	STATE_COMMENT_4,   // /**
+	STATE_DOT,         // .
+	STATE_INT_0,       // int 0
+	STATE_INT_VAL,     // int 1-9 then 0-9
+	STATE_INT_DOT,     // int + .
+	STATE_DOUBLE,      // double
+	STATE_DOUBLE_E,    // double e
+	STATE_DOUBLE_SIGN, // double e +/-
+	STATE_DOUBLE_EXP,  // double e 0-9
 } ScannerState;
 
 typedef struct {
@@ -164,8 +172,8 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 			else if (character == '.') {
-				token->type = TOKEN_SE_DOT;
-				return ERR_OK;
+				state = STATE_DOT;
+				break;
 			}
 
 			else if (character == ':') {
@@ -369,6 +377,15 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			} else {
 				state = STATE_COMMENT_2;
 				break;
+			}
+
+		case STATE_DOT: // NEDOROBENE!!!
+			if (character >= '0' && character <= '9') {
+				state = STATE_DOUBLE;
+				break;
+			} else {
+				ungetc(character, stdin);
+				return ERR_LEXICAL;
 			}
 		}
 	}
