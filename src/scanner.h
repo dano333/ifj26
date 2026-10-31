@@ -15,6 +15,8 @@ typedef struct {
 	StringBuffer buffer;
 	int line;
 	int column;
+	int end_of_line;
+
 } Scanner;
 
 ErrorCode get_token(Token *token, Scanner *scanner); // token only valid until next call
