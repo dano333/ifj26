@@ -8,6 +8,7 @@
 #define SCANNER_H
 
 #include "error.h"
+#include "indent_stack.h"
 #include "string_buffer.h"
 #include "token.h"
 
@@ -16,6 +17,9 @@ typedef struct {
 	int line;
 	int column;
 	int end_of_line;
+	IndentStack indent_stack;
+	int pending_dedents;
+	int paren_depth;
 
 } Scanner;
 

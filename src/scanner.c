@@ -67,7 +67,19 @@ ErrorCode scanner_init(Scanner *scanner) {
 	scanner->column = 1;
 	scanner->line = 1;
 	scanner->end_of_line = 1;
-	return string_init(&scanner->buffer);
+	scanner->pending_dedents = 0;
+	scanner->paren_depth = 0;
+	ErrorCode err1 = string_init(&scanner->buffer);
+	if (err1 != ERR_OK) {
+		return err1;
+	}
+	ErrorCode err2 = indent_stack_init(&scanner->indent_stack);
+	if (err2 != ERR_OK) {
+		string_free(&scanner->buffer);
+		return err2;
+	} else {
+		return ERR_OK;
+	}
 }
 
 void scanner_free(Scanner *scanner) {
@@ -75,6 +87,7 @@ void scanner_free(Scanner *scanner) {
 	scanner->line = 0;
 	scanner->end_of_line = 0;
 	string_free(&scanner->buffer);
+	indent_stack_free(&scanner->indent_stack);
 }
 
 static ErrorCode send_int(Token *token, Scanner *scanner, int character) {
@@ -93,10 +106,23 @@ static ErrorCode send_double(Token *token, Scanner *scanner, int character) {
 	return ERR_OK;
 }
 
+// returns 1 if \n means EOL, if not returns 0
+static int ends_logical_line(const Scanner *scanner) { return scanner->end_of_line == 0 && scanner->paren_depth == 0; }
+
 ErrorCode get_token(Token *token, Scanner *scanner) {
 	ScannerState state = STATE_START;
 	int comment_depth = 0; // depth of /* comment
 	int new_line_in_comment = 0;
+
+	int indent = 0;
+	int tab_in_indent = 0;
+	int indent_done = 0;
+
+	if (scanner->pending_dedents > 0) { // if there is more than 1 dedent
+		scanner->pending_dedents--;
+		token->type = TOKEN_DEDENT;
+		return ERR_OK;
+	}
 
 	while (1) {
 		int character = getc(stdin);
@@ -105,7 +131,20 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 		switch (state) {
 		case STATE_START:
 
-			if (character == ' ' || character == '\t') {
+			token->line = scanner->line;
+			token->column = scanner->column;
+
+			if (character == ' ') {
+				if (scanner->end_of_line == 1 && scanner->paren_depth == 0 && indent_done == 0) {
+					indent++;
+				}
+				break;
+			}
+
+			else if (character == '\t') {
+				if (scanner->end_of_line == 1) {
+					tab_in_indent = 1;
+				}
 				break;
 			}
 
@@ -114,21 +153,69 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 					scanner->end_of_line = 1;
 					token->type = TOKEN_EOL;
 					return ERR_OK;
-				} else {
-					token->type = TOKEN_EOF;
+				}
+				if (scanner->indent_stack.size > 1) {
+					indent_stack_pop(&scanner->indent_stack);
+					token->type = TOKEN_DEDENT;
 					return ERR_OK;
 				}
+				token->type = TOKEN_EOF;
+				return ERR_OK;
 			}
 
 			else if (character == '\n') {
 				scanner->column = 1;
 				scanner->line++;
-				scanner->end_of_line = 1;
-				token->type = TOKEN_EOL;
-				return ERR_OK;
+				if (ends_logical_line(scanner)) {
+					scanner->end_of_line = 1;
+					token->type = TOKEN_EOL;
+					return ERR_OK;
+				}
+				indent = 0;
+				tab_in_indent = 0;
+				indent_done = 0;
+				new_line_in_comment = 0;
+				break;
 			}
 
-			scanner->end_of_line = 0;
+			if (new_line_in_comment == 1 && character != '/') {
+				return ERR_LEXICAL;
+			}
+
+			// indent, dedent
+			if (scanner->end_of_line == 1 && scanner->paren_depth == 0 && character != '/') {
+				if (tab_in_indent == 1) {
+					return ERR_LEXICAL;
+				}
+				scanner->end_of_line = 0;
+				int top = indent_stack_top(&scanner->indent_stack);
+
+				if (indent > top) {
+					ErrorCode err = indent_stack_push(&scanner->indent_stack, indent);
+					if (err != ERR_OK) {
+						return err;
+					}
+					ungetc(character, stdin);
+					scanner->column--;
+					token->type = TOKEN_INDENT;
+					return ERR_OK;
+				} else if (indent < top) {
+					int dedents = 0;
+					while (indent < top) {
+						indent_stack_pop(&scanner->indent_stack);
+						top = indent_stack_top(&scanner->indent_stack);
+						dedents++;
+					}
+					if (indent != top) {
+						return ERR_LEXICAL;
+					}
+					scanner->pending_dedents = dedents - 1;
+					ungetc(character, stdin);
+					scanner->column--;
+					token->type = TOKEN_DEDENT;
+					return ERR_OK;
+				}
+			}
 
 			if (character == '+') {
 				token->type = TOKEN_OP_PLUS;
@@ -146,6 +233,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 			else if (character == '/') {
+				indent_done = 1;
 				state = STATE_DIV;
 				break;
 			}
@@ -192,11 +280,15 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 			else if (character == '(') {
+				scanner->paren_depth++;
 				token->type = TOKEN_SE_LPAREN;
 				return ERR_OK;
 			}
 
 			else if (character == ')') {
+				if (scanner->paren_depth > 0) {
+					scanner->paren_depth--;
+				}
 				token->type = TOKEN_SE_RPAREN;
 				return ERR_OK;
 			}
@@ -265,6 +357,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				comment_depth++;
 				break;
 			} else {
+				scanner->end_of_line = 0;
 				token->type = TOKEN_OP_DIV;
 				ungetc(character, stdin);
 				scanner->column--;
@@ -368,20 +461,21 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			if (character == '\n') {
 				scanner->column = 1;
 				scanner->line++;
-				scanner->end_of_line = 1;
-				token->type = TOKEN_EOL;
-				return ERR_OK;
-			} else if (character == EOF) {
-				if (scanner->end_of_line == 0) {
+				if (ends_logical_line(scanner)) {
 					scanner->end_of_line = 1;
 					token->type = TOKEN_EOL;
 					return ERR_OK;
-				} else {
-					token->type = TOKEN_EOF;
-					return ERR_OK;
 				}
+				indent = 0;
+				tab_in_indent = 0;
+				indent_done = 0;
+				new_line_in_comment = 0;
+				state = STATE_START;
+				break;
+			} else if (character == EOF) {
+				state = STATE_START;
+				break;
 			} else {
-				state = STATE_COMMENT_1;
 				break;
 			}
 
@@ -433,17 +527,8 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			if (character == '/' && comment_depth == 1) {
 				// end of comment
 				comment_depth--;
-
-				if (new_line_in_comment == 1) {
-					scanner->column = 1;
-					scanner->end_of_line = 1;
-					token->type = TOKEN_EOL;
-					return ERR_OK;
-				} else {
-					state = STATE_START;
-					break;
-				}
-
+				state = STATE_START;
+				break;
 			} else if (character == '/' && comment_depth != 1) {
 				comment_depth--;
 				state = STATE_COMMENT_2;
