@@ -23,6 +23,16 @@ typedef struct {
 
 } Scanner;
 
+/**
+ * @brief Reads the next lexical token from the input.
+ *
+ * Uses a state machine to analyze characters, handle identifiers, keywords,
+ * numeric/string literals, operators, comments, and indentation (INDENT/DEDENT).
+ *
+ * @param token Pointer to the Token structure where the scanned token data is stored.
+ * @param scanner Pointer to the Scanner context structure.
+ * @return ErrorCode ERR_OK on success, ERR_LEXICAL on lexical error or ither error codes form helper functions.
+ */
 ErrorCode get_token(Token *token, Scanner *scanner); // token only valid until next call
 
 /**
