@@ -19,22 +19,31 @@ typedef enum {
 	STATE_AND,    // &
 	STATE_OR,     // |
 	STATE_IDENT,
-	STATE_COMMENT_1,                         // //
-	STATE_COMMENT_2,                         // /*
-	STATE_COMMENT_3,                         // /* + another /
-	STATE_COMMENT_4,                         // /**
-	STATE_DOT,                               // .
-	STATE_DOUBLE,                            // double
-	STATE_INT_1_9,                           // int 1-9
-	STATE_INT_0,                             // int 0
-	STATE_DOUBLE_E,                          // double e
-	STATE_DOUBLE_E_PLUS_MINUS_0_9,           // double e '+/-' 0-9
-	STATE_DOUBLE_E_PLUS_MINUS,               // double e +/-
-	STATE_DOUBLE_UNDERSCORE,                 // double_
-	STATE_INT_1_9_UNDERSCORE,                // int 1-9_
-	STATE_DOUBLE_DOT,                        // double .
-	STATE_DOUBLE_D,                          // double D
-	STATE_DOUBLE_E_PLUS_MINUS_0_9_UNDERSCORE // double e '+/-' 0-9 _
+	STATE_COMMENT_1,                          // //
+	STATE_COMMENT_2,                          // /*
+	STATE_COMMENT_3,                          // /* + another /
+	STATE_COMMENT_4,                          // /**
+	STATE_DOT,                                // .
+	STATE_DOUBLE,                             // double
+	STATE_INT_1_9,                            // int 1-9
+	STATE_INT_0,                              // int 0
+	STATE_DOUBLE_E,                           // double e
+	STATE_DOUBLE_E_PLUS_MINUS_0_9,            // double e '+/-' 0-9
+	STATE_DOUBLE_E_PLUS_MINUS,                // double e +/-
+	STATE_DOUBLE_UNDERSCORE,                  // double_
+	STATE_INT_1_9_UNDERSCORE,                 // int 1-9_
+	STATE_DOUBLE_DOT,                         // double .
+	STATE_DOUBLE_D,                           // double D
+	STATE_DOUBLE_E_PLUS_MINUS_0_9_UNDERSCORE, // double e '+/-' 0-9 _
+	STATE_STR_SINGLE_START,                   // "
+	STATE_STR_SINGLE_ESCAPE,                  /* \ */
+	STATE_STR_SINGLE_CONTENT,                 // " text
+	STATE_STR_SINGLE_END,                     // " text"
+	STATE_STR_EMPTY,                          // ""
+	STATE_STR_MULTI_START,                    // """ text
+	STATE_STR_MULTI_Q1,                       // """ text "
+	STATE_STR_MULTI_Q2,                       // """ text ""
+	STATE_STR_MULTI_END                       // """ text """
 } ScannerState;
 
 typedef struct {
@@ -132,7 +141,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 		case STATE_START:
 
 			token->line = scanner->line;
-			token->column = scanner->column;
+			token->column = scanner->column - 1;
 
 			if (character == ' ') {
 				if (scanner->end_of_line == 1 && scanner->paren_depth == 0 && indent_done == 0) {
@@ -265,6 +274,12 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 
 			else if (character == '|') {
 				state = STATE_OR;
+				break;
+			}
+
+			else if (character == '"') {
+				string_clear(&scanner->buffer);
+				state = STATE_STR_SINGLE_START;
 				break;
 			}
 
@@ -756,6 +771,179 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			} else {
 				return ERR_LEXICAL;
 			}
+
+		case STATE_STR_SINGLE_START:
+
+			if (character == '"') {
+				state = STATE_STR_EMPTY;
+				break;
+			} else if (character == '\n' || character == EOF) {
+				return ERR_LEXICAL;
+			} else if (character == '\\') {
+				state = STATE_STR_SINGLE_ESCAPE;
+				break;
+			} else {
+				ErrorCode err = string_add_char(&scanner->buffer, character);
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_STR_SINGLE_CONTENT;
+				break;
+			}
+
+		case STATE_STR_SINGLE_ESCAPE:
+
+			if (character == '\\') {
+				ErrorCode err = string_add_char(&scanner->buffer, '\\');
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_STR_SINGLE_CONTENT;
+				break;
+			} else if (character == '"') {
+				ErrorCode err = string_add_char(&scanner->buffer, '"');
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_STR_SINGLE_CONTENT;
+				break;
+			} else if (character == 'n') {
+				ErrorCode err = string_add_char(&scanner->buffer, '\n');
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_STR_SINGLE_CONTENT;
+				break;
+			} else if (character == 't') {
+				ErrorCode err = string_add_char(&scanner->buffer, '\t');
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_STR_SINGLE_CONTENT;
+				break;
+			} else if (character == 'r') {
+				ErrorCode err = string_add_char(&scanner->buffer, '\r');
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_STR_SINGLE_CONTENT;
+				break;
+			} else {
+				return ERR_LEXICAL;
+			}
+
+		case STATE_STR_SINGLE_CONTENT:
+
+			if (character == '"') {
+				state = STATE_STR_SINGLE_END;
+				break;
+			} else if (character == '\\') {
+				state = STATE_STR_SINGLE_ESCAPE;
+				break;
+			} else if (character == '\n' || character == EOF) {
+				return ERR_LEXICAL;
+			} else {
+				ErrorCode err = string_add_char(&scanner->buffer, character);
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_STR_SINGLE_CONTENT;
+				break;
+			}
+
+		case STATE_STR_SINGLE_END:
+
+			ungetc(character, stdin);
+			scanner->column--;
+			token->type = TOKEN_LIT_STRING;
+			token->value.string_value = &scanner->buffer;
+			return ERR_OK;
+
+		case STATE_STR_EMPTY:
+
+			if (character == '"') {
+				state = STATE_STR_MULTI_START;
+				break;
+			} else {
+				ungetc(character, stdin);
+				scanner->column--;
+				token->type = TOKEN_LIT_STRING;
+				token->value.string_value = &scanner->buffer;
+				return ERR_OK;
+			}
+
+		case STATE_STR_MULTI_START:
+
+			if (character == '"') {
+				state = STATE_STR_MULTI_Q1;
+				break;
+			} else if (character == EOF) {
+				return ERR_LEXICAL;
+			} else if (character == '\n') {
+				scanner->line++;
+				scanner->column = 1;
+				ErrorCode err = string_add_char(&scanner->buffer, character);
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_STR_MULTI_START;
+				break;
+			} else {
+				ErrorCode err = string_add_char(&scanner->buffer, character);
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_STR_MULTI_START;
+				break;
+			}
+
+		case STATE_STR_MULTI_Q1:
+
+			if (character == '"') {
+				state = STATE_STR_MULTI_Q2;
+				break;
+			} else if (character == EOF) {
+				return ERR_LEXICAL;
+			} else {
+				ErrorCode err = string_add_char(&scanner->buffer, '"');
+				if (err != ERR_OK) {
+					return err;
+				}
+				ungetc(character, stdin);
+				scanner->column--;
+				state = STATE_STR_MULTI_START;
+				break;
+			}
+
+		case STATE_STR_MULTI_Q2:
+
+			if (character == '"') {
+				state = STATE_STR_MULTI_END;
+				break;
+			} else if (character == EOF) {
+				return ERR_LEXICAL;
+			} else {
+				ErrorCode err = string_add_char(&scanner->buffer, '"');
+				if (err != ERR_OK) {
+					return err;
+				}
+				err = string_add_char(&scanner->buffer, '"');
+				if (err != ERR_OK) {
+					return err;
+				}
+				ungetc(character, stdin);
+				scanner->column--;
+				state = STATE_STR_MULTI_START;
+				break;
+			}
+
+		case STATE_STR_MULTI_END:
+
+			ungetc(character, stdin);
+			scanner->column--;
+			token->type = TOKEN_LIT_STRING;
+			token->value.string_value = &scanner->buffer;
+			return ERR_OK;
 		}
 	}
 }
