@@ -7,7 +7,6 @@
 #include "indent_stack.h"
 #include <stdlib.h>
 
-
 #define INDENT_STACK_INITIAL_CAPACITY 16
 
 ErrorCode indent_stack_init(IndentStack *stack) {

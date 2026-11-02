@@ -5,21 +5,21 @@
  */
 
 #include "scanner.h"
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
-#include <limits.h>
 
 typedef enum {
 	STATE_START,
-	STATE_DIV,                                // /
-	STATE_ASSIGN,                             // =
-	STATE_NOT,                                // !
-	STATE_LT,                                 // <
-	STATE_GT,                                 // >
-	STATE_AND,                                // &
-	STATE_OR,                                 // |
+	STATE_DIV,    // /
+	STATE_ASSIGN, // =
+	STATE_NOT,    // !
+	STATE_LT,     // <
+	STATE_GT,     // >
+	STATE_AND,    // &
+	STATE_OR,     // |
 	STATE_IDENT,
 	STATE_COMMENT_1,                          // //
 	STATE_COMMENT_2,                          // /*
@@ -393,6 +393,10 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 
 		case STATE_DIV:
 
+			if (new_line_in_comment == 1) { // /* */  / 5 is valid,   /* \n */  / 5 is invalid
+				return ERR_LEXICAL;
+			}
+
 			if (character == '/') {
 				state = STATE_COMMENT_1;
 				break;
@@ -401,10 +405,10 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				comment_depth++;
 				break;
 			} else {
-			    scanner->end_of_line = 0;
-			    token->type = TOKEN_OP_DIV;
-			    scanner_ungetc(character, scanner);
-			    return ERR_OK;
+				scanner->end_of_line = 0;
+				token->type = TOKEN_OP_DIV;
+				scanner_ungetc(character, scanner);
+				return ERR_OK;
 			}
 
 		case STATE_ASSIGN:
@@ -484,7 +488,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			} else {
 				scanner_ungetc(character, scanner);
 				token->type = check_for_token(scanner->buffer.data);
-		
+
 				if (token->type == TOKEN_ID_IDENT) {
 					token->value.string_value = strdup(scanner->buffer.data);
 					if (token->value.string_value == NULL) {

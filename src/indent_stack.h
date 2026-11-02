@@ -9,7 +9,6 @@
 
 #include "error.h"
 
-
 typedef struct {
 	int *data;    // levels, data[0] is always the base level 0
 	int size;     // number of stored levels
