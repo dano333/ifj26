@@ -85,11 +85,14 @@ typedef struct {
 	union {
 		int int_value;
 		double double_value;
-		StringBuffer *string_value; // valid only for one scanner call
+		char *string_value;
 	} value;
 	// position for errors
 	int line;
 	int column;
 } Token;
-
+/**
+ * Frees heap-allocated resources inside a token (like identifier or string strings).
+ */
+void token_free(Token *token);
 #endif

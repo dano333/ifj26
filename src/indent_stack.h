@@ -9,11 +9,6 @@
 
 #include "error.h"
 
-/*
- * AI-generated code (Claude Sonnet 5.5).
- * Prompt: "Create the stack of ints (like string_buffer) with all its functions
- * for the scanner's INDENT/DEDENT handling."
- */
 
 typedef struct {
 	int *data;    // levels, data[0] is always the base level 0

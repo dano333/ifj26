@@ -7,11 +7,6 @@
 #include "indent_stack.h"
 #include <stdlib.h>
 
-/*
- * AI-generated code (Claude Sonnet 5.5).
- * Prompt: "Create the stack of ints (like string_buffer) with all its functions
- * for the scanner's INDENT/DEDENT handling."
- */
 
 #define INDENT_STACK_INITIAL_CAPACITY 16
 

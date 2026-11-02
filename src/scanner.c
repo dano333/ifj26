@@ -8,16 +8,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <limits.h>
 
 typedef enum {
 	STATE_START,
-	STATE_DIV,    // /
-	STATE_ASSIGN, // =
-	STATE_NOT,    // !
-	STATE_LT,     // <
-	STATE_GT,     // >
-	STATE_AND,    // &
-	STATE_OR,     // |
+	STATE_DIV,                                // /
+	STATE_ASSIGN,                             // =
+	STATE_NOT,                                // !
+	STATE_LT,                                 // <
+	STATE_GT,                                 // >
+	STATE_AND,                                // &
+	STATE_OR,                                 // |
 	STATE_IDENT,
 	STATE_COMMENT_1,                          // //
 	STATE_COMMENT_2,                          // /*
@@ -72,6 +74,20 @@ static TokenType check_for_token(const char *identifier) {
 	return TOKEN_ID_IDENT;
 }
 
+static void scanner_ungetc(int character, Scanner *scanner) {
+	if (character != EOF) {
+		ungetc(character, stdin);
+		scanner->column--;
+	}
+}
+
+void token_free(Token *token) {
+	if (token->type == TOKEN_ID_IDENT || token->type == TOKEN_LIT_STRING) {
+		free(token->value.string_value);
+		token->value.string_value = NULL;
+	}
+}
+
 ErrorCode scanner_init(Scanner *scanner) {
 	scanner->column = 1;
 	scanner->line = 1;
@@ -92,26 +108,39 @@ ErrorCode scanner_init(Scanner *scanner) {
 }
 
 void scanner_free(Scanner *scanner) {
-	scanner->column = 0;
-	scanner->line = 0;
-	scanner->end_of_line = 0;
 	string_free(&scanner->buffer);
 	indent_stack_free(&scanner->indent_stack);
 }
 
 static ErrorCode send_int(Token *token, Scanner *scanner, int character) {
-	ungetc(character, stdin);
-	scanner->column--;
+	scanner_ungetc(character, scanner);
+
+	errno = 0;
+	char *endptr;
+	long val = strtol(scanner->buffer.data, &endptr, 10);
+
+	if (errno == ERANGE || val > INT_MAX || val < INT_MIN || (endptr != NULL && *endptr != '\0')) {
+		return ERR_LEXICAL;
+	}
+
 	token->type = TOKEN_LIT_INT;
-	token->value.int_value = strtol(scanner->buffer.data, NULL, 10);
+	token->value.int_value = (int)val;
 	return ERR_OK;
 }
 
 static ErrorCode send_double(Token *token, Scanner *scanner, int character) {
-	ungetc(character, stdin);
-	scanner->column--;
+	scanner_ungetc(character, scanner);
+
+	errno = 0;
+	char *endptr;
+	double val = strtod(scanner->buffer.data, &endptr);
+
+	if (errno == ERANGE || (endptr != NULL && *endptr != '\0')) {
+		return ERR_LEXICAL;
+	}
+
 	token->type = TOKEN_LIT_DOUBLE;
-	token->value.double_value = strtod(scanner->buffer.data, NULL);
+	token->value.double_value = val;
 	return ERR_OK;
 }
 
@@ -372,11 +401,10 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				comment_depth++;
 				break;
 			} else {
-				scanner->end_of_line = 0;
-				token->type = TOKEN_OP_DIV;
-				ungetc(character, stdin);
-				scanner->column--;
-				return ERR_OK;
+			    scanner->end_of_line = 0;
+			    token->type = TOKEN_OP_DIV;
+			    scanner_ungetc(character, scanner);
+			    return ERR_OK;
 			}
 
 		case STATE_ASSIGN:
@@ -386,8 +414,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				return ERR_OK;
 			} else {
 				token->type = TOKEN_OP_ASSIGN;
-				ungetc(character, stdin);
-				scanner->column--;
+				scanner_ungetc(character, stdin);
 				return ERR_OK;
 			}
 		case STATE_NOT:
@@ -397,8 +424,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				return ERR_OK;
 			} else {
 				token->type = TOKEN_OP_NOT;
-				ungetc(character, stdin);
-				scanner->column--;
+				scanner_ungetc(character, stdin);
 				return ERR_OK;
 			}
 
@@ -412,8 +438,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				return ERR_OK;
 			} else {
 				token->type = TOKEN_COM_LT;
-				ungetc(character, stdin);
-				scanner->column--;
+				scanner_ungetc(character, stdin);
 				return ERR_OK;
 			}
 
@@ -424,8 +449,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				return ERR_OK;
 			} else {
 				token->type = TOKEN_COM_GT;
-				ungetc(character, stdin);
-				scanner->column--;
+				scanner_ungetc(character, stdin);
 				return ERR_OK;
 			}
 
@@ -435,8 +459,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				token->type = TOKEN_OP_AND;
 				return ERR_OK;
 			} else {
-				ungetc(character, stdin);
-				scanner->column--;
+				scanner_ungetc(character, stdin);
 				return ERR_LEXICAL;
 			}
 
@@ -446,8 +469,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				token->type = TOKEN_OP_OR;
 				return ERR_OK;
 			} else {
-				ungetc(character, stdin);
-				scanner->column--;
+				scanner_ungetc(character, stdin);
 				return ERR_LEXICAL;
 			}
 
@@ -460,12 +482,14 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 					return err;
 				}
 			} else {
-				ungetc(character, stdin);
-				scanner->column--;
+				scanner_ungetc(character, scanner);
 				token->type = check_for_token(scanner->buffer.data);
-
+		
 				if (token->type == TOKEN_ID_IDENT) {
-					token->value.string_value = &scanner->buffer;
+					token->value.string_value = strdup(scanner->buffer.data);
+					if (token->value.string_value == NULL) {
+						return ERR_INTERNAL_COMPILER;
+					}
 				}
 				return ERR_OK;
 			}
@@ -575,8 +599,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				break;
 			} else {
 				token->type = TOKEN_SE_DOT;
-				ungetc(character, stdin);
-				scanner->column--;
+				scanner_ungetc(character, stdin);
 				return ERR_OK;
 			}
 
@@ -853,10 +876,12 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 
 		case STATE_STR_SINGLE_END:
 
-			ungetc(character, stdin);
-			scanner->column--;
+			scanner_ungetc(character, scanner);
 			token->type = TOKEN_LIT_STRING;
-			token->value.string_value = &scanner->buffer;
+			token->value.string_value = strdup(scanner->buffer.data);
+			if (token->value.string_value == NULL) {
+				return ERR_INTERNAL_COMPILER;
+			}
 			return ERR_OK;
 
 		case STATE_STR_EMPTY:
@@ -909,8 +934,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				if (err != ERR_OK) {
 					return err;
 				}
-				ungetc(character, stdin);
-				scanner->column--;
+				scanner_ungetc(character, scanner);
 				state = STATE_STR_MULTI_START;
 				break;
 			}
@@ -931,18 +955,19 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				if (err != ERR_OK) {
 					return err;
 				}
-				ungetc(character, stdin);
-				scanner->column--;
+				scanner_ungetc(character, scanner);
 				state = STATE_STR_MULTI_START;
 				break;
 			}
 
 		case STATE_STR_MULTI_END:
 
-			ungetc(character, stdin);
-			scanner->column--;
+			scanner_ungetc(character, scanner);
 			token->type = TOKEN_LIT_STRING;
-			token->value.string_value = &scanner->buffer;
+			token->value.string_value = strdup(scanner->buffer.data);
+			if (token->value.string_value == NULL) {
+				return ERR_INTERNAL_COMPILER;
+			}
 			return ERR_OK;
 		}
 	}
