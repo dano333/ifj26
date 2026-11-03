@@ -4,6 +4,7 @@
  * Description: scanner
  */
 
+#define _POSIX_C_SOURCE 200809L
 #include "scanner.h"
 #include <errno.h>
 #include <limits.h>
@@ -233,8 +234,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 					if (err != ERR_OK) {
 						return err;
 					}
-					ungetc(character, stdin);
-					scanner->column--;
+					scanner_ungetc(character, scanner);
 					token->type = TOKEN_INDENT;
 					return ERR_OK;
 				} else if (indent < top) {
@@ -248,8 +248,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 						return ERR_LEXICAL;
 					}
 					scanner->pending_dedents = dedents - 1;
-					ungetc(character, stdin);
-					scanner->column--;
+					scanner_ungetc(character, scanner);
 					token->type = TOKEN_DEDENT;
 					return ERR_OK;
 				}
@@ -418,7 +417,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				return ERR_OK;
 			} else {
 				token->type = TOKEN_OP_ASSIGN;
-				scanner_ungetc(character, stdin);
+				scanner_ungetc(character, scanner);
 				return ERR_OK;
 			}
 		case STATE_NOT:
@@ -428,7 +427,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				return ERR_OK;
 			} else {
 				token->type = TOKEN_OP_NOT;
-				scanner_ungetc(character, stdin);
+				scanner_ungetc(character, scanner);
 				return ERR_OK;
 			}
 
@@ -442,7 +441,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				return ERR_OK;
 			} else {
 				token->type = TOKEN_COM_LT;
-				scanner_ungetc(character, stdin);
+				scanner_ungetc(character, scanner);
 				return ERR_OK;
 			}
 
@@ -453,7 +452,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				return ERR_OK;
 			} else {
 				token->type = TOKEN_COM_GT;
-				scanner_ungetc(character, stdin);
+				scanner_ungetc(character, scanner);
 				return ERR_OK;
 			}
 
@@ -463,7 +462,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				token->type = TOKEN_OP_AND;
 				return ERR_OK;
 			} else {
-				scanner_ungetc(character, stdin);
+				scanner_ungetc(character, scanner);
 				return ERR_LEXICAL;
 			}
 
@@ -473,7 +472,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				token->type = TOKEN_OP_OR;
 				return ERR_OK;
 			} else {
-				scanner_ungetc(character, stdin);
+				scanner_ungetc(character, scanner);
 				return ERR_LEXICAL;
 			}
 
@@ -603,7 +602,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				break;
 			} else {
 				token->type = TOKEN_SE_DOT;
-				scanner_ungetc(character, stdin);
+				scanner_ungetc(character, scanner);
 				return ERR_OK;
 			}
 
@@ -894,10 +893,12 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				state = STATE_STR_MULTI_START;
 				break;
 			} else {
-				ungetc(character, stdin);
-				scanner->column--;
+				scanner_ungetc(character, scanner);
 				token->type = TOKEN_LIT_STRING;
-				token->value.string_value = &scanner->buffer;
+				token->value.string_value = strdup(scanner->buffer.data);
+				if (token->value.string_value == NULL) {
+					return ERR_INTERNAL_COMPILER;
+				}
 				return ERR_OK;
 			}
 
