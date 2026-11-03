@@ -4,22 +4,22 @@
 Lexikálny analyzátor je implementovaný ako deterministický konečný automat ktorý číta zdrojový kód znak po znaku a na základe aktuálneho stavu a načítaneho znaku prechádza na nové stavy a posiela tokeny.
 
 \subsection{Rozhranie pre parser}
-Funkcia \texttt{get_token(Token *token, Scanner *scanner)} po zavolaní vracia jeden štrukturovaný \texttt{Token} obsahujúci typ tokenu, hodnotu čísla int alebo double alebo \texttt{StringBuffer} pre reťazce alebo identifikátory a pozíciu (riadok, stĺpec) pre vypisovanie chýb.
+Funkcia \texttt{get\_token(Token *token, Scanner *scanner)} po zavolaní vracia jeden štrukturovaný \texttt{Token} obsahujúci typ tokenu, hodnotu čísla int alebo double alebo \texttt{StringBuffer} pre reťazce alebo identifikátory a pozíciu (riadok, stĺpec) pre vypisovanie chýb.
 
 \subsection{Spracovanie kľúčových slov a identifikátorov}
-Identifikátory a kľúčové slová sa najprv načítavajú do bufferu a potom sa pomocou funkcie \texttt{check_for_token(const char *identifier)} porovnajú so statickým poľom kľúčových slov jazyka IFJ26 a rozlíšia sa na kľúčové slovo alebo identifikátor.
+Identifikátory a kľúčové slová sa najprv načítavajú do bufferu a potom sa pomocou funkcie \texttt{check\_for\_token(const char *identifier)} porovnajú so statickým poľom kľúčových slov jazyka IFJ26 a rozlíšia sa na kľúčové slovo alebo identifikátor.
 
 \subsection{Číselné literály}
-Automat pri číslach postupne podľa stavu a načítaného znaku rozlíši či sa jedná o celočíslo, desatinné číslo alebo číslo vo vedeckom zápise. Znaky \texttt{_} sa na miestach kde sa môžu nachádzať ignorujú a znaky \texttt{e/E} a \texttt{d/D} sa používaju na určenie zápisu čísla.
+Automat pri číslach postupne podľa stavu a načítaného znaku rozlíši či sa jedná o celočíslo, desatinné číslo alebo číslo vo vedeckom zápise. Znaky \texttt{\_} sa na miestach kde sa môžu nachádzať ignorujú a znaky \texttt{e/E} a \texttt{d/D} sa používaju na určenie zápisu čísla.
 
 \subsection{Reťazcové literály}
-Automat v jednoriadkovom reťazci kontroluje jednotlivé znaky postupne a ak nájde v reťazci znak \texttt{\\} tak akceptuje ako ďalší znak iba jeden z piatich povolených ktoré môžu nasledovať.
+Automat v jednoriadkovom reťazci kontroluje jednotlivé znaky postupne a ak nájde v reťazci znak \texttt{\textbackslash{}} tak akceptuje ako ďalší znak iba jeden z piatich povolených ktoré môžu nasledovať.
 Ak sa v reťazci objaví \texttt{EOF} alebo \texttt{LF} alebo sa reťazec neukončí tak vyhodí chybu.
 Vo viacriadkovom reťazci kontroluje správny začiatok, koniec a či sa v ňom nenachádza \texttt{EOF}.
 
 \subsection{Odsadenie}
-Skener kontroluje odsadenia pomocou zásobníka \texttt{indent_stack}, skener si značí kedy začína nový logický riadok (ignoruje \texttt{LF} v zátvorkách a pri komentároch).
-Skener počíta medzery na začiatku logického a porovnáva ich so zásobníkom vďaka čomu potom posiela tokeny \texttt{TOKEN_INDENT} a \texttt{TOKEN_DEDENT}.
+Skener kontroluje odsadenia pomocou zásobníka \texttt{indent\_stack}, skener si značí kedy začína nový logický riadok (ignoruje \texttt{LF} v zátvorkách a pri komentároch).
+Skener počíta medzery na začiatku logického a porovnáva ich so zásobníkom vďaka čomu potom posiela tokeny \texttt{TOKEN\_INDENT} a \texttt{TOKEN\_DEDENT}.
 
 \subsection{Komentáre}
-Skener ignoruje riadky s komentármi a podporuje vnorené úrovne viacriadkových komentárov \texttt{/* ... */} pomocou sledovania hĺbky cez premennú \texttt{comment_depth}
+Skener ignoruje riadky s komentármi a podporuje vnorené úrovne viacriadkových komentárov \texttt{/\* ... \*/} pomocou sledovania hĺbky cez premennú \texttt{comment\_depth}
