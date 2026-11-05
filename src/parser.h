@@ -41,4 +41,70 @@ ErrorCode parser_init(Parser *parser, Scanner *scanner);
  */
 ErrorCode compare_token(Parser *parser, TokenType expected);
 
+/* =========================================================================
+ * LL gramma/table
+ * ========================================================================= */
+
+/**
+ * @brief Parses the program prologue and extensions.
+ */
+ErrorCode prolog(Parser *parser);
+ErrorCode extension(Parser *parser);
+ErrorCode e_body(Parser *parser);
+ErrorCode eb_next(Parser *parser);
+
+/**
+ * @brief Parses function parameters and types.
+ */
+ErrorCode parameter(Parser *parser);
+ErrorCode param_next(Parser *parser);
+ErrorCode param_tail(Parser *parser);
+ErrorCode type_func(Parser *parser);
+ErrorCode data_type(Parser *parser);
+
+/**
+ * @brief Parses function body and statements.
+ */
+ErrorCode f_body(Parser *parser);
+ErrorCode stmt(Parser *parser);
+ErrorCode stmt_next(Parser *parser);
+
+/**
+ * @brief Parses expressions, values, return values and assignments.
+ */
+ErrorCode ret_val(Parser *parser);
+ErrorCode dec(Parser *parser);
+ErrorCode val(Parser *parser);
+ErrorCode parse_expression(Parser *parser);
+ErrorCode exp_cont(Parser *parser);
+
+/**
+ * @brief Parses conditional statements (if-else blocks and inline controls).
+ */
+ErrorCode if_stmt_all(Parser *parser);
+ErrorCode if_next(Parser *parser);
+ErrorCode else_next(Parser *parser);
+ErrorCode if_control(Parser *parser);
+ErrorCode if_control_next(Parser *parser);
+
+/**
+ * @brief Parses for loops, generators, ranges, steps, and guards.
+ */
+ErrorCode for_stmt(Parser *parser);
+ErrorCode for_content(Parser *parser);
+ErrorCode generator(Parser *parser);
+ErrorCode range_func(Parser *parser);
+ErrorCode opt_step(Parser *parser);
+ErrorCode opt_guards(Parser *parser);
+ErrorCode eol_guards(Parser *parser);
+ErrorCode for_body(Parser *parser);
+
+/**
+ * Frees the parser
+ * Frees the string buffer
+ *
+ * @param parser structure
+ */
+void parser_free(Parser *parser);
+
 #endif  
