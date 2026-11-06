@@ -34,6 +34,9 @@ typedef enum {
 	/** attempt to write to a non-modifiable variable or a formal function parameter */
 	ERR_SEMANTIC_FORBIDDEN_WRITING = 7,
 
+	/** invalid operand types for unary/binary operators or control flow conditions */
+	ERR_SEMANTIC_TYPE = 8,
+
 	/** other semantic errors */
 	ERR_SEMANTIC_OTHER = 10,
 

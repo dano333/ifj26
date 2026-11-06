@@ -10,11 +10,51 @@
 #include "error.h"
 #include "scanner.h"
 #include "token.h"
+#include "symtable.h"
 
 typedef struct {
 	Scanner *scanner;
+	SymTable *current_scope;
 	Token current_token;
+	DataType current_ret_type;
 } Parser;
+
+ErrorCode f_list(Parser *parser);
+ErrorCode f_def(Parser *parser);
+ErrorCode anotacia(Parser *parser);
+ErrorCode new_line(Parser *parser);
+ErrorCode extension(Parser *parser);
+ErrorCode e_body(Parser *parser);
+ErrorCode eb_next(Parser *parser);
+ErrorCode parameter(Parser *parser);
+ErrorCode param_next(Parser *parser);
+ErrorCode param_tail(Parser *parser);
+ErrorCode data_type(Parser *parser, DataType *out_type);
+ErrorCode f_body_end(Parser *parser);
+ErrorCode f_body(Parser *parser);
+ErrorCode ret_val(Parser *parser, DataType expected_ret_type);
+ErrorCode val(Parser *parser, DataType *out_type);
+ErrorCode dec(Parser *parser);
+ErrorCode stmt_next(Parser *parser);
+ErrorCode stmt(Parser *parser);
+ErrorCode if_stmt_all(Parser *parser);
+ErrorCode if_next(Parser *parser);
+ErrorCode else_next(Parser *parser);
+ErrorCode if_control(Parser *parser);
+ErrorCode if_control_next(Parser *parser);
+ErrorCode for_stmt(Parser *parser);
+ErrorCode for_content(Parser *parser);
+ErrorCode generator(Parser *parser);
+ErrorCode range_func(Parser *parser);
+ErrorCode opt_step(Parser *parser);
+ErrorCode opt_guards(Parser *parser);
+ErrorCode eol_guards(Parser *parser);
+ErrorCode for_body(Parser *parser);
+ErrorCode exp_cont(Parser *parser, DataType left_type, DataType *out_type);
+ErrorCode parse_expr(Parser *parser, DataType *out_type);
+ErrorCode type_func(Parser *parser, DataType *out_type);
+ErrorCode type(Parser *parser, DataType *out_type);
+ErrorCode param_lists(Parser *parser);
 
 /**
  * @brief Initializes the parser and prepares it for syntactic analysis.
@@ -26,7 +66,12 @@ typedef struct {
  * @param scanner Pointer to the already prepared and open scanner to fetch tokens from.
  * @return ErrorCode ERR_OK on success, or an error code
  */
-ErrorCode parser_init(Parser *parser, Scanner *scanner);
+ErrorCode parser_init(Parser *parser, Scanner *scanner, SymTable *global_table);
+
+/**
+ * @brief Parses the program prologue and extensions.
+ */
+ErrorCode prolog(Parser *parser);
 
 /**
  * @brief Compares the current token with the expected grammar token type.
@@ -39,64 +84,6 @@ ErrorCode parser_init(Parser *parser, Scanner *scanner);
  * @return ErrorCode ERR_OK if the token matches, ERR_SYNTAX if a syntax error occurs.
  */
 ErrorCode compare_token(Parser *parser, TokenType expected);
-
-/* =========================================================================
- * LL gramma/table
- * ========================================================================= */
-
-/**
- * @brief Parses the program prologue and extensions.
- */
-ErrorCode prolog(Parser *parser);
-ErrorCode extension(Parser *parser);
-ErrorCode e_body(Parser *parser);
-ErrorCode eb_next(Parser *parser);
-
-/**
- * @brief Parses function parameters and types.
- */
-ErrorCode parameter(Parser *parser);
-ErrorCode param_next(Parser *parser);
-ErrorCode param_tail(Parser *parser);
-ErrorCode type_func(Parser *parser);
-ErrorCode data_type(Parser *parser);
-
-/**
- * @brief Parses function body and statements.
- */
-ErrorCode f_body(Parser *parser);
-ErrorCode stmt(Parser *parser);
-ErrorCode stmt_next(Parser *parser);
-
-/**
- * @brief Parses expressions, values, return values and assignments.
- */
-ErrorCode ret_val(Parser *parser);
-ErrorCode dec(Parser *parser);
-ErrorCode val(Parser *parser);
-ErrorCode parse_expression(Parser *parser);
-ErrorCode exp_cont(Parser *parser);
-
-/**
- * @brief Parses conditional statements (if-else blocks and inline controls).
- */
-ErrorCode if_stmt_all(Parser *parser);
-ErrorCode if_next(Parser *parser);
-ErrorCode else_next(Parser *parser);
-ErrorCode if_control(Parser *parser);
-ErrorCode if_control_next(Parser *parser);
-
-/**
- * @brief Parses for loops, generators, ranges, steps, and guards.
- */
-ErrorCode for_stmt(Parser *parser);
-ErrorCode for_content(Parser *parser);
-ErrorCode generator(Parser *parser);
-ErrorCode range_func(Parser *parser);
-ErrorCode opt_step(Parser *parser);
-ErrorCode opt_guards(Parser *parser);
-ErrorCode eol_guards(Parser *parser);
-ErrorCode for_body(Parser *parser);
 
 /**
  * Frees the parser
