@@ -11,25 +11,24 @@ OBJS = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRCS))
 HDRS = $(wildcard $(SRC_DIR)/*.h)
 DEPS = $(OBJS:.o=.d)
 
--include $(DEPS)
+.PHONY: all clean run check format build-check
 
-.PHONY: all build clean run check format build-check
+all: $(TARGET)
 
-all: build
-
-build: $(TARGET)
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
-	mkdir -p $(BUILD_DIR)
+	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(TARGET): $(OBJS)
-	$(CC) $(OBJS) -o $@
+	$(CC) $(CFLAGS) $(OBJS) -o $@
+
+-include $(DEPS)
 
 clean:
 	rm -rf $(BUILD_DIR) $(TARGET)
 
-run:
-	./ifj26
+run: all
+	./$(TARGET)
 
 check:
 	clang-format --dry-run -Werror $(SRCS) $(HDRS)
@@ -37,4 +36,4 @@ check:
 format:
 	clang-format -i $(SRCS) $(HDRS)
 
-build-check: check build
+build-check: check all

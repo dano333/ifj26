@@ -35,6 +35,9 @@ typedef enum {
 	TOKEN_KW_TYPE,      // type
 	TOKEN_KW_TRUE,      // true
 	TOKEN_KW_FALSE,     // false
+	TOKEN_KW_TO,        // to
+	TOKEN_KW_UNTIL,     // until
+	TOKEN_KW_BY,        // by
 
 	/*operators*/
 	TOKEN_OP_ASSIGN, // =
