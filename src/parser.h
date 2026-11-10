@@ -11,6 +11,7 @@
 #include "scanner.h"
 #include "token.h"
 #include "symtable.h"
+#include <stdbool.h>
 
 typedef struct {
 	Scanner *scanner;
@@ -19,42 +20,42 @@ typedef struct {
 	DataType current_ret_type;
 } Parser;
 
-ErrorCode f_list(Parser *parser);
-ErrorCode f_def(Parser *parser);
+ErrorCode f_list(Parser *parser, AstNode ***functions, int *func_count, AstNode ***extensions, int *ext_count);
+ErrorCode f_def(Parser *parser, AstNode **func_node);
 ErrorCode anotacia(Parser *parser);
-ErrorCode new_line(Parser *parser);
-ErrorCode extension(Parser *parser);
-ErrorCode e_body(Parser *parser);
-ErrorCode eb_next(Parser *parser);
-ErrorCode parameter(Parser *parser);
-ErrorCode param_next(Parser *parser);
-ErrorCode param_tail(Parser *parser);
+ErrorCode extension(Parser *parser, AstNode **ext_node);
+ErrorCode e_body(Parser *parser, AstNode **ext_body_node);
+ErrorCode eb_next(Parser *parser, AstNode ***funcs, int *func_count, int *func_capacity);
+ErrorCode parameter(Parser *parser, AstNode **param_node, AstNode ***params, int *param_count);
+ErrorCode param_next(Parser *parser, AstNode ***params, int *param_count);
+ErrorCode param_tail(Parser *parser, AstNode ***params, int *param_count);
 ErrorCode data_type(Parser *parser, DataType *out_type);
-ErrorCode f_body_end(Parser *parser);
-ErrorCode f_body(Parser *parser);
-ErrorCode ret_val(Parser *parser, DataType expected_ret_type);
-ErrorCode val(Parser *parser, DataType *out_type);
-ErrorCode dec(Parser *parser);
-ErrorCode stmt_next(Parser *parser);
-ErrorCode stmt(Parser *parser);
-ErrorCode if_stmt_all(Parser *parser);
-ErrorCode if_next(Parser *parser);
-ErrorCode else_next(Parser *parser);
-ErrorCode if_control(Parser *parser);
-ErrorCode if_control_next(Parser *parser);
-ErrorCode for_stmt(Parser *parser);
-ErrorCode for_content(Parser *parser);
-ErrorCode generator(Parser *parser);
-ErrorCode range_func(Parser *parser);
-ErrorCode opt_step(Parser *parser);
-ErrorCode opt_guards(Parser *parser);
-ErrorCode eol_guards(Parser *parser);
-ErrorCode for_body(Parser *parser);
+ErrorCode f_body_end(Parser *parser, AstNode **body_node);
+ErrorCode f_body(Parser *parser, AstNode **body_node);
+ErrorCode new_line(Parser *parser);
+ErrorCode ret_val(Parser *parser, DataType expected_ret_type, AstNode **return_node);
+ErrorCode val(Parser *parser, AstNode **out_node, DataType *out_type);
+ErrorCode dec(Parser *parser, AstNode **expr_node, DataType *out_type);
+ErrorCode stmt_next(Parser *parser, AstNode ***statements_out, int *count_out);
+ErrorCode stmt(Parser *parser, AstNode **first_stmt);
+ErrorCode if_stmt_all(Parser *parser, AstNode **out_node);
+ErrorCode if_next(Parser *parser, AstNode **out_node);
+ErrorCode else_next(Parser *parser, AstNode **out_node);
+ErrorCode if_control(Parser *parser, AstNode **out_node);
+ErrorCode if_control_next(Parser *parser, AstNode **out_node);
+ErrorCode for_stmt(Parser *parser, AstNode **out_node);
+ErrorCode for_content(Parser *parser, AstNode **out_node);
+ErrorCode generator(Parser *parser, char **out_var_name, AstNode **out_from, AstNode **out_to, bool *out_is_until, AstNode **out_step);
+ErrorCode range_func(Parser *parser, bool *is_until);
+ErrorCode opt_step(Parser *parser, AstNode **out_node);
+ErrorCode opt_guards(Parser *parser, AstNode ***guards_out, int *count_out);
+ErrorCode eol_guards(Parser *parser, AstNode ***guards_out, int *count_out);
+ErrorCode for_body(Parser *parser, AstNode **out_node);
 ErrorCode exp_cont(Parser *parser, DataType left_type, DataType *out_type);
-ErrorCode parse_expr(Parser *parser, DataType *out_type);
+ErrorCode parse_expr(Parser *parser, AstNode **out_node, DataType *out_type);
 ErrorCode type_func(Parser *parser, DataType *out_type);
 ErrorCode type(Parser *parser, DataType *out_type);
-ErrorCode param_lists(Parser *parser);
+ErrorCode param_lists(Parser *parser, AstNode ***params, int *param_count);
 
 /**
  * @brief Initializes the parser and prepares it for syntactic analysis.
@@ -71,7 +72,7 @@ ErrorCode parser_init(Parser *parser, Scanner *scanner, SymTable *global_table);
 /**
  * @brief Parses the program prologue and extensions.
  */
-ErrorCode prolog(Parser *parser);
+ErrorCode prolog(Parser *parser, AstNode **out_program_node);
 
 /**
  * @brief Compares the current token with the expected grammar token type.

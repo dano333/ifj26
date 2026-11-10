@@ -13,16 +13,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/*
-
-výrazy (val, exp_cont, parse_expr)
-
-
-príkazy (stmt, stmt_next, ret_val), if_*, for_*, param_*
-pomocné append_node, wrap_in_block, token_to_op, free_nodes
-
-*/
-
 
 
 /* --- DEBUG MACRO FOR PARSING ERRORS --- */
@@ -60,7 +50,7 @@ static bool is_f_def(TokenType type) { return (type == TOKEN_KW_DEF || type == T
 //=============================================================================================================================
 //													DONE AST
 //=============================================================================================================================
-ErrorCode prolog(Parser *parser /*, AstNode **out_program_node*/ ) {
+ErrorCode prolog(Parser *parser , AstNode **out_program_node ) {
 	ErrorCode err = ERR_OK;
 
 	while (parser->current_token.type == TOKEN_EOL) {
@@ -585,7 +575,7 @@ ErrorCode f_body_end(Parser *parser, AstNode **body_node) {
         }
         stmt_array[0] = expr_node;
         
-        *body_node = ast_new_block(stmt_array, 1, parser->current_token.line, parser->current_token.column);
+        *body_node = ast_new_block(stmt_array, 1, 1, parser->current_token.line, parser->current_token.column);
 
         if (parser->current_token.type == TOKEN_EOL) {
             if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK)
@@ -632,7 +622,7 @@ ErrorCode f_body(Parser *parser, AstNode **body_node) {
         return err;
     }
 
-    *body_node = ast_new_block(statements, stmt_count, parser->current_token.line, parser->current_token.column);
+    *body_node = ast_new_block(statements, stmt_count, 1, parser->current_token.line, parser->current_token.column);
 
     return ERR_OK;
 }
@@ -786,120 +776,136 @@ ErrorCode ret_val(Parser *parser, DataType expected_ret_type, AstNode **return_n
 }
 
 
-ErrorCode val(Parser *parser, DataType *out_type) {
-	ErrorCode err = ERR_OK;
-	TokenType t = parser->current_token.type;
+// Pravidlá 46-47: <VAL> -> <EXP> | <IF_CONTROL>[cite: 3]
+ErrorCode val(Parser *parser, AstNode **out_node, DataType *out_type) {
+    ErrorCode err = ERR_OK;
+    TokenType t = parser->current_token.type;
+    *out_node = NULL;
 
-	if (t == TOKEN_KW_IF) {
-		if ((err = if_control(parser)) != ERR_OK) {
-			return err;
-		}
-		*out_type = TYPE_UNKNOWN;
-	} else if (t == TOKEN_SE_LPAREN) {
-		if ((err = compare_token(parser, TOKEN_SE_LPAREN)) != ERR_OK)
-			return err;
-		if (parser->current_token.type != TOKEN_SE_RPAREN) {
-			if ((err = parse_expr(parser, out_type)) != ERR_OK)
-				return err;
-		} else {
-			*out_type = TYPE_UNIT;
-		}
-		if ((err = compare_token(parser, TOKEN_SE_RPAREN)) != ERR_OK)
-			return err;
-	} else if (t == TOKEN_OP_MINUS || t == TOKEN_OP_NOT) {
-		TokenType op = t;
-		if ((err = compare_token(parser, t)) != ERR_OK)
-			return err;
-		if ((err = val(parser, out_type)) != ERR_OK)
-			return err;
-		if (op == TOKEN_OP_MINUS && *out_type != TYPE_INT && *out_type != TYPE_DOUBLE) {
-			return ERR_SEMANTIC_TYPE;
-		}
-		if (op == TOKEN_OP_NOT && *out_type != TYPE_BOOLEAN) {
-			return ERR_SEMANTIC_TYPE;
-		}
-	} else if (t == TOKEN_LIT_INT) {
-		*out_type = TYPE_INT;
-		if ((err = compare_token(parser, t)) != ERR_OK)
-			return err;
-	} else if (t == TOKEN_LIT_DOUBLE) {
-		*out_type = TYPE_DOUBLE;
-		if ((err = compare_token(parser, t)) != ERR_OK)
-			return err;
-	} else if (t == TOKEN_LIT_STRING) {
-		*out_type = TYPE_STRING;
-		if ((err = compare_token(parser, t)) != ERR_OK)
-			return err;
-	} else if (t == TOKEN_KW_TRUE || t == TOKEN_KW_FALSE) {
-		*out_type = TYPE_BOOLEAN;
-		if ((err = compare_token(parser, t)) != ERR_OK)
-			return err;
-	} else if (t == TOKEN_ID_IDENT) {
-		char *id_name = strdup(parser->current_token.value.string_value);
+    if (t == TOKEN_KW_IF) {
+        // Pravidlo 47: <VAL> -> <IF_CONTROL>[cite: 3]
+        if ((err = if_control(parser, out_type)) != ERR_OK) {
+            return err;
+        }
+        *out_type = TYPE_UNKNOWN;
+    } else if (t == TOKEN_SE_LPAREN) {
+        if ((err = compare_token(parser, TOKEN_SE_LPAREN)) != ERR_OK)
+            return err;
+        if (parser->current_token.type != TOKEN_SE_RPAREN) {
+            
+            AstNode *expr_node = NULL;
+            if ((err = parse_expr(parser, &expr_node, out_type)) != ERR_OK) {
+                ast_free(expr_node);
+                return err;
+            }
+            *out_node = expr_node;
+        } else {
+            *out_type = TYPE_UNIT;
+        }
+        if ((err = compare_token(parser, TOKEN_SE_RPAREN)) != ERR_OK)
+            return err;
+    } else if (t == TOKEN_OP_MINUS || t == TOKEN_OP_NOT) {
+        TokenType op = t;
+        if ((err = compare_token(parser, t)) != ERR_OK)
+            return err;
+        if ((err = val(parser, out_node, out_type)) != ERR_OK)
+            return err;
+        if (op == TOKEN_OP_MINUS && *out_type != TYPE_INT && *out_type != TYPE_DOUBLE) {
+            return ERR_SEMANTIC_TYPE;
+        }
+        if (op == TOKEN_OP_NOT && *out_type != TYPE_BOOLEAN) {
+            return ERR_SEMANTIC_TYPE;
+        }
+    } else if (t == TOKEN_LIT_INT) {
+        *out_type = TYPE_INT;
+        if ((err = compare_token(parser, t)) != ERR_OK)
+            return err;
+    } else if (t == TOKEN_LIT_DOUBLE) {
+        *out_type = TYPE_DOUBLE;
+        if ((err = compare_token(parser, t)) != ERR_OK)
+            return err;
+    } else if (t == TOKEN_LIT_STRING) {
+        *out_type = TYPE_STRING;
+        if ((err = compare_token(parser, t)) != ERR_OK)
+            return err;
+    } else if (t == TOKEN_KW_TRUE || t == TOKEN_KW_FALSE) {
+        *out_type = TYPE_BOOLEAN;
+        if ((err = compare_token(parser, t)) != ERR_OK)
+            return err;
+    } else if (t == TOKEN_ID_IDENT) {
+        char *id_name = strdup(parser->current_token.value.string_value);
 
-		Symbol *sym = symtable_lookup(parser->current_scope, id_name);
-		if (sym == NULL) {
-			fprintf(stderr, "\n[SEMANTIC DEBUG] Undefined identifier or function: '%s' at line %d\n", id_name,
-			        parser->current_token.line);
-			free(id_name);
-			return ERR_SEMANTIC_UNDEFINED;
-		}
-		*out_type = sym->type;
+        Symbol *sym = symtable_lookup(parser->current_scope, id_name);
+        if (sym == NULL) {
+            fprintf(stderr, "\n[SEMANTIC DEBUG] Undefined identifier or function: '%s' at line %d\n", id_name,
+                    parser->current_token.line);
+            free(id_name);
+            return ERR_SEMANTIC_UNDEFINED;
+        }
+        *out_type = sym->type;
 
-		if ((err = compare_token(parser, TOKEN_ID_IDENT)) != ERR_OK) {
-			free(id_name);
-			return err;
-		}
+        if ((err = compare_token(parser, TOKEN_ID_IDENT)) != ERR_OK) {
+            free(id_name);
+            return err;
+        }
 
-		if (parser->current_token.type == TOKEN_SE_LPAREN) {
-			if ((err = compare_token(parser, TOKEN_SE_LPAREN)) != ERR_OK) {
-				free(id_name);
-				return err;
-			}
+        if (parser->current_token.type == TOKEN_SE_LPAREN) {
+            if ((err = compare_token(parser, TOKEN_SE_LPAREN)) != ERR_OK) {
+                free(id_name);
+                return err;
+            }
 
-			int arg_count = 0;
-			DataType arg_types[10];
+            int arg_count = 0;
+            DataType arg_types[10];
 
-			if (parser->current_token.type != TOKEN_SE_RPAREN) {
-				DataType a_type;
-				if ((err = parse_expr(parser, &a_type)) != ERR_OK) {
-					free(id_name);
-					return err;
-				}
-				arg_types[arg_count++] = a_type;
+            if (parser->current_token.type != TOKEN_SE_RPAREN) {
+                DataType a_type;
+                AstNode *arg_node = NULL;
+                
+                if ((err = parse_expr(parser, &arg_node, &a_type)) != ERR_OK) {
+                    free(id_name);
+                    ast_free(arg_node);
+                    return err;
+                }
+                arg_types[arg_count++] = a_type;
+                ast_free(arg_node);
 
-				while (parser->current_token.type == TOKEN_SE_COMMA) {
-					if ((err = compare_token(parser, TOKEN_SE_COMMA)) != ERR_OK) {
-						free(id_name);
-						return err;
-					}
-					if ((err = parse_expr(parser, &a_type)) != ERR_OK) {
-						free(id_name);
-						return err;
-					}
-					if (arg_count < 10)
-						arg_types[arg_count++] = a_type;
-				}
-			}
-			if ((err = compare_token(parser, TOKEN_SE_RPAREN)) != ERR_OK) {
-				free(id_name);
-				return err;
-			}
+                while (parser->current_token.type == TOKEN_SE_COMMA) {
+                    if ((err = compare_token(parser, TOKEN_SE_COMMA)) != ERR_OK) {
+                        free(id_name);
+                        return err;
+                    }
+                    AstNode *next_arg_node = NULL;
+                    if ((err = parse_expr(parser, &next_arg_node, &a_type)) != ERR_OK) {
+                        free(id_name);
+                        ast_free(next_arg_node);
+                        return err;
+                    }
+                    if (arg_count < 10)
+                        arg_types[arg_count++] = a_type;
+                    ast_free(next_arg_node);
+                }
+            }
+            if ((err = compare_token(parser, TOKEN_SE_RPAREN)) != ERR_OK) {
+                free(id_name);
+                return err;
+            }
 
-			DataType ret_type;
-			if ((err = validate_function_call(parser->current_scope, id_name, arg_types, arg_count, &ret_type)) != ERR_OK) {
-				free(id_name);
-				return err;
-			}
-			*out_type = ret_type;
-		}
-		free(id_name);
-	} else {
-		PARSER_ERR("val");
-	}
+            DataType ret_type;
+            if ((err = validate_function_call(parser->current_scope, id_name, arg_types, arg_count, &ret_type)) != ERR_OK) {
+                free(id_name);
+                return err;
+            }
+            *out_type = ret_type;
+        }
+        free(id_name);
+    } else {
+        PARSER_ERR("val");
+    }
 
-	return ERR_OK;
+    return ERR_OK;
 }
+
 ErrorCode dec(Parser *parser, AstNode **expr_node, DataType *out_type) {
     ErrorCode err = ERR_OK;
     TokenType t = parser->current_token.type;
@@ -921,49 +927,90 @@ ErrorCode dec(Parser *parser, AstNode **expr_node, DataType *out_type) {
         if ((err = exp_cont(parser, left_dummy, out_type)) != ERR_OK)
             return err;
             
-        // Ak exp_cont vytvára aj uzol, priradíme ho sem (záleží na vašej implementácii exp_cont)
+        
     } else {
-        // Ak je to voliteľná deklarácia bez priradenia (napr. len `let x: Int`), 
-        // môže to byť v poriadku, uzol bude NULL.
         *expr_node = NULL;
     }
 
     return ERR_OK;
 }
 
-ErrorCode stmt_next(Parser *parser) {
-	ErrorCode err = ERR_OK;
-	TokenType t = parser->current_token.type;
+// Pravidlá 32-34: <STMT_NEXT> -> EOL <STMT> <STMT_NEXT> | ; <STMT> <STMT_NEXT> | ε
+ErrorCode stmt_next(Parser *parser, AstNode ***statements_out, int *count_out) {
+    ErrorCode err = ERR_OK;
+    TokenType t = parser->current_token.type;
 
-	if (t == TOKEN_EOL) {
-		if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK)
-			return err;
-		if (parser->current_token.type == TOKEN_DEDENT) {
-			return ERR_OK;
-		}
-		if ((err = stmt(parser)) != ERR_OK)
-			return err;
-		if ((err = stmt_next(parser)) != ERR_OK)
-			return err;
-	} else if (t == TOKEN_SE_SEMICOLON) {
-		if ((err = compare_token(parser, TOKEN_SE_SEMICOLON)) != ERR_OK)
-			return err;
-		if (parser->current_token.type == TOKEN_DEDENT) {
-			return ERR_OK;
-		}
-		if ((err = stmt(parser)) != ERR_OK)
-			return err;
-		if ((err = stmt_next(parser)) != ERR_OK)
-			return err;
-	} else if (t == TOKEN_ID_IDENT || t == TOKEN_KW_VAL || t == TOKEN_KW_VAR || t == TOKEN_KW_RETURN ||
-	           t == TOKEN_KW_IF || t == TOKEN_KW_WHILE || t == TOKEN_KW_FOR) {
-		if ((err = stmt(parser)) != ERR_OK)
-			return err;
-		if ((err = stmt_next(parser)) != ERR_OK)
-			return err;
-	}
+    if (t == TOKEN_EOL) {
+        // Pravidlo 32: EOL <STMT> <STMT_NEXT>
+        if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK)
+            return err;
+            
+        
+        AstNode *next_stmt = NULL;
+        if ((err = stmt(parser, &next_stmt)) != ERR_OK)
+            return err;
+            
+        if (next_stmt != NULL) {
+            (*count_out)++;
+            AstNode **new_statements = realloc(*statements_out, (*count_out) * sizeof(AstNode *));
+            if (new_statements == NULL) {
+                ast_free(next_stmt);
+                return ERR_NOMEM;
+            }
+            *statements_out = new_statements;
+            (*statements_out)[*count_out - 1] = next_stmt;
+        }
+        
+        // Rekurzívne volanie pre ďalší stmt_next
+        if ((err = stmt_next(parser, statements_out, count_out)) != ERR_OK)
+            return err;
 
-	return ERR_OK;
+    } else if (t == TOKEN_SE_SEMICOLON) {
+        // Pravidlo 33: ; <STMT> <STMT_NEXT>
+        if ((err = compare_token(parser, TOKEN_SE_SEMICOLON)) != ERR_OK)
+            return err;
+        
+        AstNode *next_stmt = NULL;
+        if ((err = stmt(parser, &next_stmt)) != ERR_OK)
+            return err;
+            
+        if (next_stmt != NULL) {
+            (*count_out)++;
+            AstNode **new_statements = realloc(*statements_out, (*count_out) * sizeof(AstNode *));
+            if (new_statements == NULL) {
+                ast_free(next_stmt);
+                return ERR_NOMEM;
+            }
+            *statements_out = new_statements;
+            (*statements_out)[*count_out - 1] = next_stmt;
+        }
+        
+        if ((err = stmt_next(parser, statements_out, count_out)) != ERR_OK)
+            return err;
+
+    } else if (t == TOKEN_ID_IDENT || t == TOKEN_KW_VAL || t == TOKEN_KW_VAR || t == TOKEN_KW_RETURN ||
+               t == TOKEN_KW_IF || t == TOKEN_KW_WHILE || t == TOKEN_KW_FOR) {
+
+        AstNode *next_stmt = NULL;
+        if ((err = stmt(parser, &next_stmt)) != ERR_OK)
+            return err;
+            
+        if (next_stmt != NULL) {
+            (*count_out)++;
+            AstNode **new_statements = realloc(*statements_out, (*count_out) * sizeof(AstNode *));
+            if (new_statements == NULL) {
+                ast_free(next_stmt);
+                return ERR_NOMEM;
+            }
+            *statements_out = new_statements;
+            (*statements_out)[*count_out - 1] = next_stmt;
+        }
+        
+        if ((err = stmt_next(parser, statements_out, count_out)) != ERR_OK)
+            return err;
+    }
+
+    return ERR_OK;
 }
 
 ErrorCode stmt(Parser *parser, AstNode **first_stmt) {
@@ -1003,7 +1050,7 @@ ErrorCode stmt(Parser *parser, AstNode **first_stmt) {
 		}
 
 		DataType expr_type;
-		if ((err = parse_expr(parser, &expr_type)) != ERR_OK) {
+		if ((err = parse_expr(parser, &first_stmt, &expr_type)) != ERR_OK) {
 			free(var_name);
 			return err;
 		}
@@ -1065,14 +1112,14 @@ ErrorCode stmt(Parser *parser, AstNode **first_stmt) {
 
     }else if (parser->current_token.type == TOKEN_ID_IDENT) {
 		DataType expr_type;
-		if ((err = parse_expr(parser, &expr_type)) != ERR_OK) {
+		if ((err = parse_expr(parser, first_stmt, &expr_type)) != ERR_OK) {
 			return err;
 		}
 		if (parser->current_token.type == TOKEN_OP_ASSIGN) {
 			if ((err = compare_token(parser, TOKEN_OP_ASSIGN)) != ERR_OK)
 				return err;
 			DataType rhs_type;
-			if ((err = parse_expr(parser, &rhs_type)) != ERR_OK)
+			if ((err = parse_expr(parser, first_stmt, &rhs_type)) != ERR_OK)
 				return err;
 			if (!is_type_compatible(expr_type, rhs_type)) {
 				fprintf(stderr, "\n[SEMANTIC DEBUG] Type mismatch in assignment: left=%d, rhs=%d\n", expr_type,
@@ -1171,336 +1218,520 @@ ErrorCode if_stmt_all(Parser *parser, AstNode **out_node) {
     return ERR_OK;
 }
 
-ErrorCode if_next(Parser *parser) {
-	ErrorCode err = ERR_OK;
+ErrorCode if_next(Parser *parser, AstNode **out_node) {
+    ErrorCode err = ERR_OK;
+    *out_node = NULL;
 
-	if (parser->current_token.type == TOKEN_KW_ELSE) {
-		if ((err = compare_token(parser, TOKEN_KW_ELSE)) != ERR_OK)
-			return err;
-		if ((err = else_next(parser)) != ERR_OK)
-			return err;
-	}
+    if (parser->current_token.type == TOKEN_KW_ELSE) {
+        if ((err = compare_token(parser, TOKEN_KW_ELSE)) != ERR_OK)
+            return err;
+        if ((err = else_next(parser, out_node)) != ERR_OK)
+            return err;
+    }
 
-	return ERR_OK;
+    return ERR_OK;
 }
 
-ErrorCode else_next(Parser *parser) {
-	ErrorCode err = ERR_OK;
+ErrorCode else_next(Parser *parser, AstNode **out_node) {
+    ErrorCode err = ERR_OK;
+    *out_node = NULL;
 
-	if (parser->current_token.type == TOKEN_KW_IF) {
-		if ((err = if_stmt_all(parser)) != ERR_OK)
-			return err;
-	} else if (parser->current_token.type == TOKEN_EOL) {
-		if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK)
-			return err;
-		if (parser->current_token.type == TOKEN_INDENT) {
-			if ((err = compare_token(parser, TOKEN_INDENT)) != ERR_OK)
-				return err;
-			if ((err = f_body(parser)) != ERR_OK)
-				return err;
-			if (parser->current_token.type == TOKEN_DEDENT) {
-				if ((err = compare_token(parser, TOKEN_DEDENT)) != ERR_OK)
-					return err;
-			} else {
-				PARSER_ERR("else_next");
-			}
-		} else {
-			if ((err = stmt(parser)) != ERR_OK)
-				return err;
-		}
-	} else {
-		if ((err = stmt(parser)) != ERR_OK)
-			return err;
-	}
+    if (parser->current_token.type == TOKEN_KW_IF) {
+        if ((err = if_stmt_all(parser, out_node)) != ERR_OK)
+            return err;
+    } else if (parser->current_token.type == TOKEN_EOL) {
+        if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK)
+            return err;
+        if (parser->current_token.type == TOKEN_INDENT) {
+            if ((err = compare_token(parser, TOKEN_INDENT)) != ERR_OK)
+                return err;
+            if ((err = f_body(parser, out_node)) != ERR_OK)
+                return err;
+            if (parser->current_token.type == TOKEN_DEDENT) {
+                if ((err = compare_token(parser, TOKEN_DEDENT)) != ERR_OK)
+                    return err;
+            } 
+        } else {
+            if ((err = stmt(parser, out_node)) != ERR_OK)
+                return err;
+        }
+    } else {
+        if ((err = stmt(parser, out_node)) != ERR_OK)
+            return err;
+    }
 
-	return ERR_OK;
+    return ERR_OK;
 }
 
-ErrorCode if_control(Parser *parser) {
-	ErrorCode err = ERR_OK;
-	DataType cond_type;
+ErrorCode if_control(Parser *parser, AstNode **out_node) {
+    ErrorCode err = ERR_OK;
+    DataType cond_type;
+    AstNode *cond_node = NULL;
+    AstNode *then_body = NULL;
+    AstNode *else_body = NULL;
+    *out_node = NULL;
 
-	if (parser->current_token.type == TOKEN_KW_IF) {
-		if ((err = compare_token(parser, TOKEN_KW_IF)) != ERR_OK)
-			return err;
-	} else {
-		PARSER_ERR("if_control");
-	}
+    if (parser->current_token.type == TOKEN_KW_IF) {
+        if ((err = compare_token(parser, TOKEN_KW_IF)) != ERR_OK)
+            return err;
+    }
 
-	if ((err = parse_expr(parser, &cond_type)) != ERR_OK)
-		return err;
-	if (cond_type != TYPE_BOOLEAN)
-		return ERR_SEMANTIC_TYPE;
+    if ((err = parse_expr(parser, &cond_node, &cond_type)) != ERR_OK)
+        return err;
+        
+    if (cond_type != TYPE_BOOLEAN) {
+        ast_free(cond_node);
+        return ERR_SEMANTIC_TYPE;
+    }
 
-	if (parser->current_token.type == TOKEN_KW_THEN) {
-		if ((err = compare_token(parser, TOKEN_KW_THEN)) != ERR_OK)
-			return err;
-	} else {
-		PARSER_ERR("if_control");
-	}
+    if (parser->current_token.type == TOKEN_KW_THEN) {
+        if ((err = compare_token(parser, TOKEN_KW_THEN)) != ERR_OK) {
+            ast_free(cond_node);
+            return err;
+        }
+    }
 
-	if ((err = if_control_next(parser)) != ERR_OK)
-		return err;
+    // Spracovanie 'then' bloku/príkazu cez if_control_next
+    if ((err = if_control_next(parser, &then_body)) != ERR_OK) {
+        ast_free(cond_node);
+        return err;
+    }
 
-	if (parser->current_token.type == TOKEN_KW_ELSE) {
-		if ((err = compare_token(parser, TOKEN_KW_ELSE)) != ERR_OK)
-			return err;
-	} else {
-		PARSER_ERR("if_control");
-	}
+    if (parser->current_token.type == TOKEN_KW_ELSE) {
+        if ((err = compare_token(parser, TOKEN_KW_ELSE)) != ERR_OK) {
+            ast_free(cond_node);
+            ast_free(then_body);
+            return err;
+        }
+    }
 
-	if ((err = if_control_next(parser)) != ERR_OK)
-		return err;
 
-	return ERR_OK;
+    if ((err = if_control_next(parser, &else_body)) != ERR_OK) {
+        ast_free(cond_node);
+        ast_free(then_body);
+        return err;
+    }
+
+    *out_node = ast_new_if(cond_node, then_body, else_body, parser->current_token.line, parser->current_token.column);
+
+    return ERR_OK;
 }
 
-ErrorCode if_control_next(Parser *parser) {
-	ErrorCode err = ERR_OK;
-	DataType dummy_type;
 
-	if (parser->current_token.type == TOKEN_EOL) {
-		if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK)
-			return err;
-		if (parser->current_token.type == TOKEN_INDENT) {
-			if ((err = compare_token(parser, TOKEN_INDENT)) != ERR_OK)
-				return err;
-		} else {
-			PARSER_ERR("if_control_next");
-		}
-		if ((err = f_body(parser)) != ERR_OK)
-			return err;
-		if (parser->current_token.type == TOKEN_DEDENT) {
-			if ((err = compare_token(parser, TOKEN_DEDENT)) != ERR_OK)
-				return err;
-		} else {
-			PARSER_ERR("if_control_next");
-		}
-	} else {
-		if ((err = parse_expr(parser, &dummy_type)) != ERR_OK)
-			return err;
-	}
 
-	return ERR_OK;
+ErrorCode if_control_next(Parser *parser, AstNode **out_node) {
+    ErrorCode err = ERR_OK;
+    DataType dummy_type;
+    *out_node = NULL;
+
+    if (parser->current_token.type == TOKEN_EOL) {
+        if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK)
+            return err;
+            
+        if (parser->current_token.type == TOKEN_INDENT) {
+            if ((err = compare_token(parser, TOKEN_INDENT)) != ERR_OK)
+                return err;
+        } 
+        
+        if ((err = f_body(parser, out_node)) != ERR_OK)
+            return err;
+            
+        if (parser->current_token.type == TOKEN_DEDENT) {
+            if ((err = compare_token(parser, TOKEN_DEDENT)) != ERR_OK) {
+                ast_free(*out_node);
+                *out_node = NULL;
+                return err;
+            }
+        }
+    } else {
+
+        if ((err = parse_expr(parser, out_node, &dummy_type)) != ERR_OK)
+            return err;
+    }
+
+    return ERR_OK;
 }
 
-ErrorCode for_stmt(Parser *parser) {
-	ErrorCode err = ERR_OK;
+ErrorCode for_stmt(Parser *parser, AstNode **out_node) {
+    ErrorCode err = ERR_OK;
+    *out_node = NULL;
 
-	if (parser->current_token.type == TOKEN_KW_FOR) {
-		if ((err = compare_token(parser, TOKEN_KW_FOR)) != ERR_OK)
-			return err;
-	} else {
-		PARSER_ERR("for_stmt");
-	}
+    if (parser->current_token.type == TOKEN_KW_FOR) {
+        if ((err = compare_token(parser, TOKEN_KW_FOR)) != ERR_OK)
+            return err;
+    }
 
-	if ((err = for_content(parser)) != ERR_OK)
-		return err;
+    if ((err = for_content(parser, out_node)) != ERR_OK)
+        return err;
 
-	return ERR_OK;
+    return ERR_OK;
+}
+ErrorCode for_content(Parser *parser, AstNode **out_node) {
+    ErrorCode err = ERR_OK;
+    *out_node = NULL;
+
+    char *var_name = NULL;
+    AstNode *from_node = NULL;
+    AstNode *to_node = NULL;
+    AstNode *step_node = NULL;
+    bool is_until = false;
+    AstNode **guards = NULL;
+    int guard_count = 0;
+    AstNode *body_node = NULL;
+
+    // Rozdelenie podla gramatiky (Pravidlo 59 vs Pravidlo 60)
+    if (parser->current_token.type == TOKEN_EOL) {
+        // --- PRAVIDLO 60: <FOR_CONTENT> -> EOL INDENT <GENERATOR> <EOL_GUARDS> DEDENT do <FOR_BODY> ---
+        if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK)
+            return err;
+
+        if (parser->current_token.type == TOKEN_INDENT) {
+            if ((err = compare_token(parser, TOKEN_INDENT)) != ERR_OK)
+                return err;
+        } else {
+            PARSER_ERR("for_content");
+        }
+
+        // --- PRAVIDLO 61: <GENERATOR> -> id <- <EXP> <RANGE> <EXP> <OPT_STEP> ---
+        if ((err = generator(parser, &var_name, &from_node, &to_node, &is_until, &step_node)) != ERR_OK)
+            return err;
+
+        // --- PRAVIDLO 68: <EOL_GUARDS> -> EOL if <EXP> <EOL_GUARDS> ---
+        if ((err = eol_guards(parser, &guards, &guard_count)) != ERR_OK) {
+            free(var_name);
+            ast_free(from_node);
+            ast_free(to_node);
+            ast_free(step_node);
+            return err;
+        }
+
+        if (parser->current_token.type == TOKEN_DEDENT) {
+            if ((err = compare_token(parser, TOKEN_DEDENT)) != ERR_OK) {
+                free(var_name);
+                ast_free(from_node);
+                ast_free(to_node);
+                ast_free(step_node);
+                for (int i = 0; i < guard_count; i++) ast_free(guards[i]);
+                free(guards);
+                return err;
+            }
+        }
+
+    } else {
+        // --- PRAVIDLO 59: <FOR_CONTENT> -> <GENERATOR> <OPT_GUARDS> do <FOR_BODY> ---
+        
+        // --- PRAVIDLO 61: <GENERATOR> -> id <- <EXP> <RANGE> <EXP> <OPT_STEP> ---
+        if ((err = generator(parser, &var_name, &from_node, &to_node, &is_until, &step_node)) != ERR_OK)
+            return err;
+
+        // --- PRAVIDLO 66: <OPT_GUARDS> -> if <EXP> <OPT_GUARDS> ---
+        if ((err = opt_guards(parser, &guards, &guard_count)) != ERR_OK) {
+            free(var_name);
+            ast_free(from_node);
+            ast_free(to_node);
+            ast_free(step_node);
+            return err;
+        }
+    }
+
+    // --- KĽÚČOVÉ SLOVO DO ---
+    if (parser->current_token.type == TOKEN_KW_DO) {
+        if ((err = compare_token(parser, TOKEN_KW_DO)) != ERR_OK) {
+            free(var_name);
+            ast_free(from_node);
+            ast_free(to_node);
+            ast_free(step_node);
+            for (int i = 0; i < guard_count; i++) ast_free(guards[i]);
+            free(guards);
+            return err;
+        }
+    } else {
+        PARSER_ERR("for_content");
+        for (int i = 0; i < guard_count; i++) ast_free(guards[i]);
+        free(guards);
+
+    }
+
+    // --- PRAVIDLÁ 70-71: <FOR_BODY> ---
+    if ((err = for_body(parser, &body_node)) != ERR_OK) {
+        free(var_name);
+        ast_free(from_node);
+        ast_free(to_node);
+        ast_free(step_node);
+        for (int i = 0; i < guard_count; i++) ast_free(guards[i]);
+        free(guards);
+        return err;
+    }
+
+    // --- VYTVORENIE FINÁLNEGO AST UZLA ---
+    *out_node = ast_new_for(var_name, from_node, to_node, is_until, step_node, guards, guard_count, body_node, parser->current_token.line, parser->current_token.column);
+
+    free(guards);
+    free(var_name);
+    return ERR_OK;
 }
 
-ErrorCode for_content(Parser *parser) {
-	ErrorCode err = ERR_OK;
+ErrorCode generator(Parser *parser, char **out_var_name, AstNode **out_from, AstNode **out_to, bool *out_is_until, AstNode **out_step) {
+    ErrorCode err = ERR_OK;
+    DataType start_type, end_type;
+    *out_var_name = NULL;
+    *out_from = NULL;
+    *out_to = NULL;
+    *out_step = NULL;
+    *out_is_until = false;
 
-	if (parser->current_token.type == TOKEN_EOL) {
-		if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK)
-			return err;
+    // --- PRAVIDLO 61: <GENERATOR> -> id <- <EXP> <RANGE> <EXP> <OPT_STEP> ---
+    if (parser->current_token.type != TOKEN_ID_IDENT) {
+        PARSER_ERR("generator");
+    }
+    
+    *out_var_name = strdup(parser->current_token.value.string_value);
+    if (!*out_var_name) return ERR_NOMEM;
 
-		if (parser->current_token.type == TOKEN_INDENT) {
-			if ((err = compare_token(parser, TOKEN_INDENT)) != ERR_OK)
-				return err;
-		} else {
-			PARSER_ERR("for_content");
-		}
+    symtable_insert(parser->current_scope, *out_var_name, SYMBOL_VAR, TYPE_INT, true);
 
-		if ((err = generator(parser)) != ERR_OK)
-			return err;
-		if ((err = eol_guards(parser)) != ERR_OK)
-			return err;
+    if ((err = compare_token(parser, TOKEN_ID_IDENT)) != ERR_OK) {
+        free(*out_var_name);
+        *out_var_name = NULL;
+        return err;
+    }
 
-		if (parser->current_token.type == TOKEN_DEDENT) {
-			if ((err = compare_token(parser, TOKEN_DEDENT)) != ERR_OK)
-				return err;
-		} else {
-			PARSER_ERR("for_content");
-		}
+    if (parser->current_token.type != TOKEN_SE_LARROW) {
+        free(*out_var_name);
+        *out_var_name = NULL;
+        PARSER_ERR("generator");
 
-		if (parser->current_token.type == TOKEN_KW_DO) {
-			if ((err = compare_token(parser, TOKEN_KW_DO)) != ERR_OK)
-				return err;
-		} else {
-			PARSER_ERR("for_content");
-		}
+    }
+    if ((err = compare_token(parser, TOKEN_SE_LARROW)) != ERR_OK) {
+        free(*out_var_name);
+        *out_var_name = NULL;
+        return err;
+    }
 
-		if ((err = for_body(parser)) != ERR_OK)
-			return err;
-	} else {
-		if ((err = generator(parser)) != ERR_OK)
-			return err;
-		if ((err = opt_guards(parser)) != ERR_OK)
-			return err;
+    if ((err = parse_expr(parser, out_from, &start_type)) != ERR_OK) {
+        free(*out_var_name);
+        *out_var_name = NULL;
+        return err;
+    }
+    if (start_type != TYPE_INT) {
+        free(*out_var_name);
+        *out_var_name = NULL;
+        ast_free(*out_from);
+        *out_from = NULL;
+        return ERR_SEMANTIC_TYPE;
+    }
 
-		if (parser->current_token.type == TOKEN_KW_DO) {
-			if ((err = compare_token(parser, TOKEN_KW_DO)) != ERR_OK)
-				return err;
-		} else {
-			PARSER_ERR("for_content");
-		}
+    // --- PRAVIDLÁ 62-63: <RANGE> -> to / until (voláme range_func) ---
+    if ((err = range_func(parser, out_is_until)) != ERR_OK) {
+        free(*out_var_name);
+        *out_var_name = NULL;
+        ast_free(*out_from);
+        *out_from = NULL;
+        return err;
+    }
 
-		if ((err = for_body(parser)) != ERR_OK)
-			return err;
-	}
+    if ((err = parse_expr(parser, out_to, &end_type)) != ERR_OK) {
+        free(*out_var_name);
+        *out_var_name = NULL;
+        ast_free(*out_from);
+        *out_from = NULL;
+        return err;
+    }
+    if (end_type != TYPE_INT) {
+        free(*out_var_name);
+        *out_var_name = NULL;
+        ast_free(*out_from);
+        *out_from = NULL;
+        ast_free(*out_to);
+        *out_to = NULL;
+        return ERR_SEMANTIC_TYPE;
+    }
 
-	return ERR_OK;
+    // --- PRAVIDLÁ 64-65: <OPT_STEP> ---
+    if ((err = opt_step(parser, out_step)) != ERR_OK) {
+        free(*out_var_name);
+        *out_var_name = NULL;
+        ast_free(*out_from);
+        *out_from = NULL;
+        ast_free(*out_to);
+        *out_to = NULL;
+        return err;
+    }
+
+    return ERR_OK;
 }
 
-ErrorCode generator(Parser *parser) {
-	ErrorCode err = ERR_OK;
-	DataType start_type, end_type;
+ErrorCode range_func(Parser *parser, bool *is_until) {
+    ErrorCode err = ERR_OK;
 
-	if (parser->current_token.type == TOKEN_ID_IDENT) {
-		char *loop_var = strdup(parser->current_token.value.string_value);
-		symtable_insert(parser->current_scope, loop_var, SYMBOL_VAR, TYPE_INT, true);
-		free(loop_var);
-		if ((err = compare_token(parser, TOKEN_ID_IDENT)) != ERR_OK)
-			return err;
-	} else {
-		PARSER_ERR("generator");
-	}
 
-	if (parser->current_token.type == TOKEN_SE_LARROW) {
-		if ((err = compare_token(parser, TOKEN_SE_LARROW)) != ERR_OK)
-			return err;
-	} else {
-		PARSER_ERR("generator");
-	}
+    if (parser->current_token.type == TOKEN_KW_TO) {
+        if ((err = compare_token(parser, TOKEN_KW_TO)) != ERR_OK)
+            return err;
+        *is_until = false;
+    } else if (parser->current_token.type == TOKEN_KW_UNTIL) {
+        if ((err = compare_token(parser, TOKEN_KW_UNTIL)) != ERR_OK)
+            return err;
+        *is_until = true;
+    } else {
+        PARSER_ERR("range_func");
 
-	if ((err = parse_expr(parser, &start_type)) != ERR_OK)
-		return err;
-	if (start_type != TYPE_INT)
-		return ERR_SEMANTIC_TYPE;
+    }
 
-	if ((err = range_func(parser)) != ERR_OK)
-		return err;
+    return ERR_OK;
+}
+ErrorCode opt_step(Parser *parser, AstNode **out_node) {
+    ErrorCode err = ERR_OK;
+    DataType step_type;
+    *out_node = NULL;
 
-	if ((err = parse_expr(parser, &end_type)) != ERR_OK)
-		return err;
-	if (end_type != TYPE_INT)
-		return ERR_SEMANTIC_TYPE;
+    // --- PRAVIDLÁ 64-65: <OPT_STEP> -> by <EXP> | epsilon ---
+    if (parser->current_token.type == TOKEN_KW_BY) {
+        if ((err = compare_token(parser, TOKEN_KW_BY)) != ERR_OK)
+            return err;
+            
+        if ((err = parse_expr(parser, out_node, &step_type)) != ERR_OK)
+            return err;
+            
+        if (step_type != TYPE_INT) {
+            ast_free(*out_node);
+            *out_node = NULL;
+            return ERR_SEMANTIC_TYPE;
+        }
+    }
 
-	if ((err = opt_step(parser)) != ERR_OK)
-		return err;
-
-	return ERR_OK;
+    return ERR_OK;
 }
 
-ErrorCode range_func(Parser *parser) {
-	ErrorCode err = ERR_OK;
+ErrorCode opt_guards(Parser *parser, AstNode ***guards_out, int *count_out) {
+    ErrorCode err = ERR_OK;
+    *guards_out = NULL;
+    *count_out = 0;
 
-	if (parser->current_token.type == TOKEN_KW_TO) {
-		if ((err = compare_token(parser, TOKEN_KW_TO)) != ERR_OK)
-			return err;
-	} else if (parser->current_token.type == TOKEN_KW_UNTIL) {
-		if ((err = compare_token(parser, TOKEN_KW_UNTIL)) != ERR_OK)
-			return err;
-	} else {
-		PARSER_ERR("range_func");
-	}
+    // --- PRAVIDLÁ 66-67: <OPT_GUARDS> -> if <EXP> <OPT_GUARDS> | epsilon ---
+    while (parser->current_token.type == TOKEN_KW_IF) {
+        if ((err = compare_token(parser, TOKEN_KW_IF)) != ERR_OK) {
+            for (int i = 0; i < *count_out; i++) ast_free((*guards_out)[i]);
+            free(*guards_out);
+            return err;
+        }
 
-	return ERR_OK;
+        DataType guard_type;
+        AstNode *cond_node = NULL;
+        if ((err = parse_expr(parser, &cond_node, &guard_type)) != ERR_OK) {
+            for (int i = 0; i < *count_out; i++) ast_free((*guards_out)[i]);
+            free(*guards_out);
+            return err;
+        }
+
+        if (guard_type != TYPE_BOOLEAN) {
+            ast_free(cond_node);
+            for (int i = 0; i < *count_out; i++) ast_free((*guards_out)[i]);
+            free(*guards_out);
+            return ERR_SEMANTIC_TYPE;
+        }
+
+        (*count_out)++;
+        AstNode **new_guards = realloc(*guards_out, (*count_out) * sizeof(AstNode *));
+        if (!new_guards) {
+            ast_free(cond_node);
+            for (int i = 0; i < *count_out - 1; i++) ast_free((*guards_out)[i]);
+            free(*guards_out);
+            return ERR_NOMEM;
+        }
+        *guards_out = new_guards;
+        (*guards_out)[*count_out - 1] = cond_node;
+    }
+
+    return ERR_OK;
 }
 
-ErrorCode opt_step(Parser *parser) {
-	ErrorCode err = ERR_OK;
-	DataType step_type;
+ErrorCode eol_guards(Parser *parser, AstNode ***guards_out, int *count_out) {
+    ErrorCode err = ERR_OK;
+    *guards_out = NULL;
+    *count_out = 0;
 
-	if (parser->current_token.type == TOKEN_KW_BY) {
-		if ((err = compare_token(parser, TOKEN_KW_BY)) != ERR_OK)
-			return err;
-		if ((err = parse_expr(parser, &step_type)) != ERR_OK)
-			return err;
-		if (step_type != TYPE_INT)
-			return ERR_SEMANTIC_TYPE;
-	}
+    // --- PRAVIDLÁ 68-69: <EOL_GUARDS> -> EOL if <EXP> <EOL_GUARDS> | epsilon ---
+    while (parser->current_token.type == TOKEN_EOL) {
+        if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK) {
+            for (int i = 0; i < *count_out; i++) ast_free((*guards_out)[i]);
+            free(*guards_out);
+            return err;
+        }
 
-	return ERR_OK;
+        if (parser->current_token.type != TOKEN_KW_IF) {
+            break;
+        }
+
+        if ((err = compare_token(parser, TOKEN_KW_IF)) != ERR_OK) {
+            for (int i = 0; i < *count_out; i++) ast_free((*guards_out)[i]);
+            free(*guards_out);
+            return err;
+        }
+
+        DataType guard_type;
+        AstNode *cond_node = NULL;
+        if ((err = parse_expr(parser, &cond_node, &guard_type)) != ERR_OK) {
+            for (int i = 0; i < *count_out; i++) ast_free((*guards_out)[i]);
+            free(*guards_out);
+            return err;
+        }
+
+        if (guard_type != TYPE_BOOLEAN) {
+            ast_free(cond_node);
+            for (int i = 0; i < *count_out; i++) ast_free((*guards_out)[i]);
+            free(*guards_out);
+            return ERR_SEMANTIC_TYPE;
+        }
+
+        (*count_out)++;
+        AstNode **new_guards = realloc(*guards_out, (*count_out) * sizeof(AstNode *));
+        if (!new_guards) {
+            ast_free(cond_node);
+            for (int i = 0; i < *count_out - 1; i++) ast_free((*guards_out)[i]);
+            free(*guards_out);
+            return ERR_NOMEM;
+        }
+        *guards_out = new_guards;
+        (*guards_out)[*count_out - 1] = cond_node;
+    }
+
+    return ERR_OK;
 }
 
-ErrorCode opt_guards(Parser *parser) {
-	ErrorCode err = ERR_OK;
-	DataType guard_type;
+ErrorCode for_body(Parser *parser, AstNode **out_node) {
+    ErrorCode err = ERR_OK;
+    *out_node = NULL;
 
-	if (parser->current_token.type == TOKEN_KW_IF) {
-		if ((err = compare_token(parser, TOKEN_KW_IF)) != ERR_OK)
-			return err;
-		if ((err = parse_expr(parser, &guard_type)) != ERR_OK)
-			return err;
-		if (guard_type != TYPE_BOOLEAN)
-			return ERR_SEMANTIC_TYPE;
-		if ((err = opt_guards(parser)) != ERR_OK)
-			return err;
-	}
+    if (parser->current_token.type == TOKEN_EOL) {
+        // --- PRAVIDLO 71: <FOR_BODY> -> EOL INDENT <F_BODY> DEDENT ---
+        if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK)
+            return err;
 
-	return ERR_OK;
-}
+        if (parser->current_token.type == TOKEN_INDENT) {
+            if ((err = compare_token(parser, TOKEN_INDENT)) != ERR_OK)
+                return err;
+        } else {
+            PARSER_ERR("for_body");
+        }
 
-ErrorCode eol_guards(Parser *parser) {
-	ErrorCode err = ERR_OK;
-	DataType guard_type;
+        if ((err = f_body(parser, out_node)) != ERR_OK)
+            return err;
 
-	if (parser->current_token.type == TOKEN_EOL) {
-		if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK)
-			return err;
+        if (parser->current_token.type == TOKEN_DEDENT) {
+            if ((err = compare_token(parser, TOKEN_DEDENT)) != ERR_OK) {
+                ast_free(*out_node);
+                *out_node = NULL;
+                return err;
+            }
+        } 
+    } else {
+        // --- PRAVIDLO 70: <FOR_BODY> -> <STMT> ---
+        if ((err = stmt(parser, out_node)) != ERR_OK)
+            return err;
+    }
 
-		if (parser->current_token.type == TOKEN_KW_IF) {
-			if ((err = compare_token(parser, TOKEN_KW_IF)) != ERR_OK)
-				return err;
-		} else {
-			PARSER_ERR("eol_guards");
-		}
-
-		if ((err = parse_expr(parser, &guard_type)) != ERR_OK)
-			return err;
-		if (guard_type != TYPE_BOOLEAN)
-			return ERR_SEMANTIC_TYPE;
-
-		if ((err = eol_guards(parser)) != ERR_OK)
-			return err;
-	}
-
-	return ERR_OK;
-}
-
-ErrorCode for_body(Parser *parser) {
-	ErrorCode err = ERR_OK;
-
-	if (parser->current_token.type == TOKEN_EOL) {
-		if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK)
-			return err;
-
-		if (parser->current_token.type == TOKEN_INDENT) {
-			if ((err = compare_token(parser, TOKEN_INDENT)) != ERR_OK)
-				return err;
-		} else {
-			PARSER_ERR("for_body");
-		}
-
-		if ((err = f_body(parser)) != ERR_OK)
-			return err;
-
-		if (parser->current_token.type == TOKEN_DEDENT) {
-			if ((err = compare_token(parser, TOKEN_DEDENT)) != ERR_OK)
-				return err;
-		} else {
-			PARSER_ERR("for_body");
-		}
-	} else {
-		if ((err = stmt(parser)) != ERR_OK)
-			return err;
-	}
-
-	return ERR_OK;
+    return ERR_OK;
 }
 
 ErrorCode exp_cont(Parser *parser, DataType left_type, DataType *out_type) {
@@ -1531,7 +1762,7 @@ ErrorCode exp_cont(Parser *parser, DataType left_type, DataType *out_type) {
 	return ERR_OK;
 }
 
-ErrorCode parse_expr(Parser *parser, DataType *out_type) {
+ErrorCode parse_expr(Parser *parser, AstNode **out_node, DataType *out_type) {
 	ErrorCode err = ERR_OK;
 	DataType left_type;
 	if ((err = val(parser, &left_type)) != ERR_OK)
