@@ -1,10 +1,15 @@
+/*
+ * Project: IFJ26
+ * Authors: Nazar Zhyla (xzhylan00)
+ * Description: AST
+ */
+
 #ifndef AST_H
 #define AST_H
 
 #include <stdbool.h>
-#include <stddef.h>
 
-// Forward deklarácie
+
 typedef struct AstNode AstNode;
 typedef struct AstBlock AstBlock;
 
@@ -178,7 +183,9 @@ struct AstNode {
         } func_node;
 
         struct {
-            AstBlock block;     
+            AstBlock block; 
+            int count;            
+            int capacity;          
         } block_node;
 
         struct {
