@@ -47,9 +47,9 @@ ErrorCode compare_token(Parser *parser, TokenType expected) {
 static bool is_f_def(TokenType type) { return (type == TOKEN_KW_DEF || type == TOKEN_SE_AT); }
 
 
-//=============================================================================================================================
-//													DONE AST
-//=============================================================================================================================
+// =============================================================================================================================
+//                                              PROLOG (Pravidlo 1)
+// =============================================================================================================================
 ErrorCode prolog(Parser *parser , AstNode **out_program_node ) {
 	ErrorCode err = ERR_OK;
 
@@ -112,9 +112,9 @@ ErrorCode prolog(Parser *parser , AstNode **out_program_node ) {
 }
 
 
-//=============================================================================================================================
-//													DONE AST
-//=============================================================================================================================
+// =============================================================================================================================
+//                                              F_LIST (Pravidlá 2, 3, 4)
+// =============================================================================================================================
 ErrorCode f_list(Parser *parser, AstNode ***functions, int *func_count, AstNode ***extensions, int *ext_count) {
 	ErrorCode err = ERR_OK;
 	TokenType current_type = parser->current_token.type;
@@ -126,7 +126,6 @@ ErrorCode f_list(Parser *parser, AstNode ***functions, int *func_count, AstNode 
 			return err;
 		}
 
-		// Pridáme funkciu do nášho dynamického poľa (môžeš použiť realloc)
         *func_count += 1;
         *functions = realloc(*functions, (*func_count) * sizeof(AstNode *));
         (*functions)[*func_count - 1] = func_node;
@@ -145,7 +144,6 @@ ErrorCode f_list(Parser *parser, AstNode ***functions, int *func_count, AstNode 
 			return err;
 		}
 
-		// Pridáme rozšírenie do dynamického poľa rozšírení
         *ext_count += 1;
         *extensions = realloc(*extensions, (*ext_count) * sizeof(AstNode *));
         (*extensions)[*ext_count - 1] = ext_node;
@@ -153,14 +151,15 @@ ErrorCode f_list(Parser *parser, AstNode ***functions, int *func_count, AstNode 
         return f_list(parser, functions, func_count, extensions, ext_count);
 
 	} else {
+        // Pravidlo 4: <F_List> -> ε
 		return ERR_OK;
 	}
 }
 
 
-//=============================================================================================================================
-//													DONE AST
-//=============================================================================================================================
+// =============================================================================================================================
+//                                              F_DEF (Pravidlo 5)
+// =============================================================================================================================
 ErrorCode f_def(Parser *parser, AstNode **func_node) {
 	ErrorCode err = ERR_OK;
 
@@ -232,9 +231,6 @@ ErrorCode f_def(Parser *parser, AstNode **func_node) {
 		free(func_name);
 		return err;
 	}
-//																												 //
-//	===========================================================================================================  //		
-//																												 //
 
 	*func_node = ast_new_func_def(func_name, NULL, 0, NULL, 0, true, ret_type, body_node,false, parser->current_token.line, parser->current_token.column);
     free(func_name);
@@ -245,6 +241,10 @@ ErrorCode f_def(Parser *parser, AstNode **func_node) {
 	return ERR_OK;
 }
 
+
+// =============================================================================================================================
+//                                              ANOTACIA (Pravidlá 10, 11)
+// =============================================================================================================================
 ErrorCode anotacia(Parser *parser) {
 	ErrorCode err = ERR_OK;
 	if (parser->current_token.type == TOKEN_SE_AT) {
@@ -271,15 +271,17 @@ ErrorCode anotacia(Parser *parser) {
 				return err;
 			}
 		}
-	}
+	} else {
+        // Pravidlo 11: <ANOTACIA> -> ε
+    }
 
 	return ERR_OK;
 }
 
 
-//=============================================================================================================================
-//													DONE AST
-//=============================================================================================================================
+// =============================================================================================================================
+//                                              EXTENSION (Pravidlo 14)
+// =============================================================================================================================
 ErrorCode extension(Parser *parser, AstNode **ext_node) {
     ErrorCode err = ERR_OK;
     DataType dummy_type;
@@ -291,7 +293,6 @@ ErrorCode extension(Parser *parser, AstNode **ext_node) {
         PARSER_ERR("extension");
     }
 
-    // 1. Uložíme si názov rozšírenia
     char *ext_name = strdup(parser->current_token.value.string_value);
 
     if ((err = compare_token(parser, TOKEN_ID_IDENT)) != ERR_OK) {
@@ -311,7 +312,6 @@ ErrorCode extension(Parser *parser, AstNode **ext_node) {
         return err;
     }
 
-    // 2. Voliteľne: Vytvorenie scope pre extension, ak je potrebný pre tabuľku symbolov
     SymTable ext_scope;
     symtable_init(&ext_scope, parser->current_scope);
     parser->current_scope = &ext_scope;
@@ -356,9 +356,9 @@ ErrorCode extension(Parser *parser, AstNode **ext_node) {
 }
 
 
-//=============================================================================================================================
-//													DONE AST
-//=============================================================================================================================
+// =============================================================================================================================
+//                                              E_BODY (Pravidlo 15)
+// =============================================================================================================================
 ErrorCode e_body(Parser *parser, AstNode **ext_body_node) {
     ErrorCode err = ERR_OK;
     DataType dummy_type;
@@ -370,7 +370,6 @@ ErrorCode e_body(Parser *parser, AstNode **ext_body_node) {
         PARSER_ERR("e_body: expected method name");
     }
 
-    // 1. Uložíme si názov func
     char *func_name = strdup(parser->current_token.value.string_value);
     if (!func_name) return ERR_NOMEM;
 
@@ -408,33 +407,29 @@ ErrorCode e_body(Parser *parser, AstNode **ext_body_node) {
 
     free(func_name);
 
-
-
-
 	AstNode **funcs = NULL;
 	int func_count = 0;
 	int func_capacity = 0;
 	if ((err = eb_next(parser, &funcs, &func_count, &func_capacity)) != ERR_OK)
-    return err;
+        return err;
 
     return ERR_OK;
 }
 
 
-//=============================================================================================================================
-//													DONE AST
-//=============================================================================================================================
+// =============================================================================================================================
+//                                              EB_NEXT (Pravidlá 16, 17)
+// =============================================================================================================================
 ErrorCode eb_next(Parser *parser, AstNode ***funcs, int *func_count, int *func_capacity) {
     ErrorCode err = ERR_OK;
 
-
     if (parser->current_token.type == TOKEN_KW_DEF) {
+        // Pravidlo 16: <EB_NEXT> -> <E_BODY>
         AstNode *func_node = NULL;
         
         if ((err = e_body(parser, &func_node)) != ERR_OK) {
             return err;
         }
-
         
         if (*func_count >= *func_capacity) {
             int new_capacity = (*func_capacity == 0) ? 4 : (*func_capacity * 2);
@@ -447,48 +442,52 @@ ErrorCode eb_next(Parser *parser, AstNode ***funcs, int *func_count, int *func_c
             *func_capacity = new_capacity;
         }
 
-
         (*funcs)[*func_count] = func_node;
         (*func_count)++;
 		
+    } else {
+        // Pravidlo 17: <EB_NEXT> -> ε
     }
 
     return ERR_OK;
 }
 
 
-//=============================================================================================================================
-//													DONE AST
-//=============================================================================================================================
+// =============================================================================================================================
+//                                              TYPE (Pravidlá 20–24)
+// =============================================================================================================================
 ErrorCode type(Parser *parser, DataType *out_type) {
 	TokenType current_token = parser->current_token.type;
 
-	if (current_token == TOKEN_KW_INT) {
+	if (current_token == TOKEN_KW_INT) {       // Pravidlo 20
 		*out_type = TYPE_INT;
 		return parser_next_token(parser);
-	} else if (current_token == TOKEN_KW_DOUBLE) {
+	} else if (current_token == TOKEN_KW_DOUBLE) { // Pravidlo 21
 		*out_type = TYPE_DOUBLE;
 		return parser_next_token(parser);
-	} else if (current_token == TOKEN_KW_STRING) {
+	} else if (current_token == TOKEN_KW_STRING) { // Pravidlo 22
 		*out_type = TYPE_STRING;
 		return parser_next_token(parser);
-	} else if (current_token == TOKEN_KW_UNIT) {
+	} else if (current_token == TOKEN_KW_UNIT) {   // Pravidlo 23
 		*out_type = TYPE_UNIT;
 		return parser_next_token(parser);
-	} else if (current_token == TOKEN_KW_BOOLEAN) {
+	} else if (current_token == TOKEN_KW_BOOLEAN) { // Pravidlo 24
 		*out_type = TYPE_BOOLEAN;
 		return parser_next_token(parser);
 	} else {
 		PARSER_ERR("type");
 	}
 }
-//=============================================================================================================================
-//													DONE AST
-//=============================================================================================================================
+
+
+// =============================================================================================================================
+//                                              PARAM_LISTS (Pravidlá 6, 7)
+// =============================================================================================================================
 ErrorCode param_lists(Parser *parser, AstNode ***params, int *param_count) {
 	ErrorCode err = ERR_OK;
 
 	if (parser->current_token.type == TOKEN_SE_LPAREN) {
+        // Pravidlo 6: <PARAM_LISTS> -> (<PARAMETER>) <PARAM_LISTS>
 		if ((err = compare_token(parser, TOKEN_SE_LPAREN)) != ERR_OK)
 			return err;
 
@@ -512,32 +511,38 @@ ErrorCode param_lists(Parser *parser, AstNode ***params, int *param_count) {
 
 		if ((err = param_lists(parser, params, param_count)) != ERR_OK)
 			return err;
-	}
+	} else {
+        // Pravidlo 7: <PARAM_LISTS> -> ε
+    }
 
 	return ERR_OK;
 }
 
 
-//=============================================================================================================================
-//													DONE AST
-//=============================================================================================================================
+// =============================================================================================================================
+//                                              DATA_TYPE (Pravidlá 18, 19)
+// =============================================================================================================================
 ErrorCode data_type(Parser *parser, DataType *out_type) {
 	ErrorCode err = ERR_OK;
 	*out_type = TYPE_UNKNOWN;
 
 	if (parser->current_token.type == TOKEN_SE_COLON) {
+        // Pravidlo 18: <D_TYPE> -> : <TYPE>
 		if ((err = compare_token(parser, TOKEN_SE_COLON)) != ERR_OK)
 			return err;
 		if ((err = type(parser, out_type)) != ERR_OK)
 			return err;
-	}
+	} else {
+        // Pravidlo 19: <D_TYPE> -> ε
+    }
 
 	return ERR_OK;
 }
 
-//=============================================================================================================================
-//													DONE AST
-//=============================================================================================================================
+
+// =============================================================================================================================
+//                                              F_BODY_END (Pravidlá 8, 9)
+// =============================================================================================================================
 ErrorCode f_body_end(Parser *parser, AstNode **body_node) {
     ErrorCode err = ERR_OK;
     DataType dummy_type;
@@ -548,10 +553,10 @@ ErrorCode f_body_end(Parser *parser, AstNode **body_node) {
     }
 
     if (parser->current_token.type == TOKEN_INDENT) {
+        // Pravidlo 8: <F_BODY_END> -> EOL INDENT <F_BODY> DEDENT
         if ((err = compare_token(parser, TOKEN_INDENT)) != ERR_OK)
             return err;
             
-        // Tu posielame výstupný uzol pre telo bloku
         if ((err = f_body(parser, body_node)) != ERR_OK)
             return err;
             
@@ -562,7 +567,7 @@ ErrorCode f_body_end(Parser *parser, AstNode **body_node) {
             PARSER_ERR("f_body_end");
         }
     } else {
-        
+        // Pravidlo 9: <F_BODY_END> -> <VAL> EOL
         AstNode *expr_node = NULL;
         DataType expr_type;
         if ((err = parse_expr(parser, &expr_node, &expr_type)) != ERR_OK)
@@ -586,15 +591,16 @@ ErrorCode f_body_end(Parser *parser, AstNode **body_node) {
     return ERR_OK;
 }
 
-//=============================================================================================================================
-//													DONE AST
-//=============================================================================================================================
 
+// =============================================================================================================================
+//                                              F_BODY (Pravidlo 31)
+// =============================================================================================================================
 ErrorCode f_body(Parser *parser, AstNode **body_node) {
     ErrorCode err = ERR_OK;
     AstNode **statements = NULL;
     int stmt_count = 0;
 
+    // Pravidlo 31: <F_BODY> -> <STMT> <STMT_NEXT>
     AstNode *first_stmt = NULL;
     if ((err = stmt(parser, &first_stmt)) != ERR_OK) {
         free(statements);
@@ -612,7 +618,6 @@ ErrorCode f_body(Parser *parser, AstNode **body_node) {
         statements = new_statements;
         statements[stmt_count - 1] = first_stmt;
     }
-
     
     if ((err = stmt_next(parser, &statements, &stmt_count)) != ERR_OK) {
         for (int i = 0; i < stmt_count; i++) {
@@ -628,27 +633,32 @@ ErrorCode f_body(Parser *parser, AstNode **body_node) {
 }
 
 
-//=============================================================================================================================
-//													DONE AST
-//=============================================================================================================================
+// =============================================================================================================================
+//                                              NEW_LINE (Pravidlá 12, 13)
+// =============================================================================================================================
 ErrorCode new_line(Parser *parser) {
 	ErrorCode err = ERR_OK;
 	if (parser->current_token.type == TOKEN_EOL) {
+        // Pravidlo 12: <NEW_LINE> -> EOL
 		if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK) {
 			return err;
 		}
-	}
+	} else {
+        // Pravidlo 13: <NEW_LINE> -> ε
+    }
 	return ERR_OK;
 }
 
-//=============================================================================================================================
-//													DONE AST
-//=============================================================================================================================
+
+// =============================================================================================================================
+//                                              PARAMETER (Pravidlá 25, 26)
+// =============================================================================================================================
 ErrorCode parameter(Parser *parser, AstNode **param_node, AstNode ***params, int *param_count){
     ErrorCode err = ERR_OK;
     DataType p_type;
 
     if (parser->current_token.type == TOKEN_ID_IDENT) {
+        // Pravidlo 25: <PARAMETER> -> id: <TYPE> <PARAM_NEXT>
         char *param_name = strdup(parser->current_token.value.string_value);
         if (!param_name) return ERR_NOMEM;
 
@@ -670,38 +680,45 @@ ErrorCode parameter(Parser *parser, AstNode **param_node, AstNode ***params, int
         *param_node = ast_new_param(param_name, p_type, parser->current_token.line, parser->current_token.column);
         free(param_name);
 
-        // Posunieme pole do param_next
         if ((err = param_next(parser, params, param_count)) != ERR_OK)
             return err;
+    } else {
+        // Pravidlo 26: <PARAMETER> -> ε
     }
 
     return ERR_OK;
 }
 
-//=============================================================================================================================
-//													DONE AST
-//=============================================================================================================================
+
+// =============================================================================================================================
+//                                              PARAM_NEXT (Pravidlá 27, 28)
+// =============================================================================================================================
 ErrorCode param_next(Parser *parser, AstNode ***params, int *param_count) {
     ErrorCode err = ERR_OK;
 
     if (parser->current_token.type == TOKEN_SE_COMMA) {
+        // Pravidlo 27: <PARAM_NEXT> -> , <PARAM_TAIL>
         if ((err = compare_token(parser, TOKEN_SE_COMMA)) != ERR_OK)
             return err;
         if ((err = param_tail(parser, params, param_count)) != ERR_OK)
             return err;
+    } else {
+        // Pravidlo 28: <PARAM_NEXT> -> ε
     }
 
     return ERR_OK;
 }
 
-//=============================================================================================================================
-//													DONE AST
-//=============================================================================================================================
+
+// =============================================================================================================================
+//                                              PARAM_TAIL (Pravidlá 29, 30)
+// =============================================================================================================================
 ErrorCode param_tail(Parser *parser, AstNode ***params, int *param_count) {
     ErrorCode err = ERR_OK;
     DataType p_type;
 
     if (parser->current_token.type == TOKEN_ID_IDENT) {
+        // Pravidlo 29: <PARAM_TAIL> -> id: <TYPE> <PARAM_NEXT>
         char *param_name = strdup(parser->current_token.value.string_value);
         if (!param_name) return ERR_NOMEM;
 
@@ -736,25 +753,28 @@ ErrorCode param_tail(Parser *parser, AstNode ***params, int *param_count) {
 
         if ((err = param_next(parser, params, param_count)) != ERR_OK)
             return err;
+    } else {
+        // Pravidlo 30: <PARAM_TAIL> -> ε
     }
 
     return ERR_OK;
 }
 
-//=============================================================================================================================
-//													DONE AST
-//=============================================================================================================================
+
+// =============================================================================================================================
+//                                              RET_VAL (Pravidlá 41, 42)
+// =============================================================================================================================
 ErrorCode ret_val(Parser *parser, DataType expected_ret_type, AstNode **return_node) {
     ErrorCode err = ERR_OK;
     DataType expr_type = TYPE_UNIT;
     AstNode *expr_node = NULL;
     TokenType t = parser->current_token.type;
 
-
     if (t == TOKEN_ID_IDENT || t == TOKEN_LIT_INT || t == TOKEN_LIT_DOUBLE || t == TOKEN_LIT_STRING ||
         t == TOKEN_KW_TRUE || t == TOKEN_KW_FALSE || t == TOKEN_SE_LPAREN || t == TOKEN_OP_MINUS || t == TOKEN_OP_NOT ||
         t == TOKEN_KW_IF) {
         
+        // Pravidlo 41: <RET_VAL> -> <VAL>
         if ((err = parse_expr(parser, &expr_node, &expr_type)) != ERR_OK) {
             return err;
         }
@@ -767,8 +787,9 @@ ErrorCode ret_val(Parser *parser, DataType expected_ret_type, AstNode **return_n
         }
     } else if (expected_ret_type != TYPE_UNIT && expected_ret_type != TYPE_UNKNOWN) {
         return ERR_SEMANTIC_COMPATIBILITY;
+    } else {
+        // Pravidlo 42: <RET_VAL> -> ε
     }
-
     
     *return_node = ast_new_return(expr_node, parser->current_token.line, parser->current_token.column);
 
@@ -776,15 +797,17 @@ ErrorCode ret_val(Parser *parser, DataType expected_ret_type, AstNode **return_n
 }
 
 
-// Pravidlá 46-47: <VAL> -> <EXP> | <IF_CONTROL>[cite: 3]
+// =============================================================================================================================
+//                                              VAL (Pravidlá 46, 47)
+// =============================================================================================================================
 ErrorCode val(Parser *parser, AstNode **out_node, DataType *out_type) {
     ErrorCode err = ERR_OK;
     TokenType t = parser->current_token.type;
     *out_node = NULL;
 
     if (t == TOKEN_KW_IF) {
-        // Pravidlo 47: <VAL> -> <IF_CONTROL>[cite: 3]
-        if ((err = if_control(parser, out_type)) != ERR_OK) {
+        // Pravidlo 47: <VAL> -> <IF_CONTROL>
+        if ((err = if_control(parser, out_node)) != ERR_OK) {
             return err;
         }
         *out_type = TYPE_UNKNOWN;
@@ -792,7 +815,6 @@ ErrorCode val(Parser *parser, AstNode **out_node, DataType *out_type) {
         if ((err = compare_token(parser, TOKEN_SE_LPAREN)) != ERR_OK)
             return err;
         if (parser->current_token.type != TOKEN_SE_RPAREN) {
-            
             AstNode *expr_node = NULL;
             if ((err = parse_expr(parser, &expr_node, out_type)) != ERR_OK) {
                 ast_free(expr_node);
@@ -900,20 +922,25 @@ ErrorCode val(Parser *parser, AstNode **out_node, DataType *out_type) {
         }
         free(id_name);
     } else {
+        // Pravidlo 46: <VAL> -> <EXP> (resp. štandardný termín výrazu)
         PARSER_ERR("val");
     }
 
     return ERR_OK;
 }
 
+
+// =============================================================================================================================
+//                                              DEC (Pravidlá 43, 44, 45)
+// =============================================================================================================================
 ErrorCode dec(Parser *parser, AstNode **expr_node, DataType *out_type) {
     ErrorCode err = ERR_OK;
     TokenType t = parser->current_token.type;
 
     if (t == TOKEN_OP_ASSIGN) {
+        // Pravidlo 43: <DEC> -> = <VAL>
         if ((err = compare_token(parser, TOKEN_OP_ASSIGN)) != ERR_OK)
             return err;
-        
         
         if ((err = parse_expr(parser, expr_node, out_type)) != ERR_OK)
             return err;
@@ -923,29 +950,32 @@ ErrorCode dec(Parser *parser, AstNode **expr_node, DataType *out_type) {
                t == TOKEN_COM_GE || t == TOKEN_OP_AND || t == TOKEN_OP_OR || t == TOKEN_SE_DOT ||
                t == TOKEN_SE_LPAREN) {
         
+        // Pravidlo 44: <DEC> -> <EXP_CONT>
         DataType left_dummy = TYPE_UNKNOWN;
         if ((err = exp_cont(parser, left_dummy, out_type)) != ERR_OK)
             return err;
             
-        
     } else {
+        // Pravidlo 45: <DEC> -> ε
         *expr_node = NULL;
     }
 
     return ERR_OK;
 }
 
-// Pravidlá 32-34: <STMT_NEXT> -> EOL <STMT> <STMT_NEXT> | ; <STMT> <STMT_NEXT> | ε
+
+// =============================================================================================================================
+//                                              STMT_NEXT (Pravidlá 32, 33, 34)
+// =============================================================================================================================
 ErrorCode stmt_next(Parser *parser, AstNode ***statements_out, int *count_out) {
     ErrorCode err = ERR_OK;
     TokenType t = parser->current_token.type;
 
     if (t == TOKEN_EOL) {
-        // Pravidlo 32: EOL <STMT> <STMT_NEXT>
+        // Pravidlo 32: <STMT_NEXT> -> EOL <STMT> <STMT_NEXT>
         if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK)
             return err;
             
-        
         AstNode *next_stmt = NULL;
         if ((err = stmt(parser, &next_stmt)) != ERR_OK)
             return err;
@@ -961,12 +991,11 @@ ErrorCode stmt_next(Parser *parser, AstNode ***statements_out, int *count_out) {
             (*statements_out)[*count_out - 1] = next_stmt;
         }
         
-        // Rekurzívne volanie pre ďalší stmt_next
         if ((err = stmt_next(parser, statements_out, count_out)) != ERR_OK)
             return err;
 
     } else if (t == TOKEN_SE_SEMICOLON) {
-        // Pravidlo 33: ; <STMT> <STMT_NEXT>
+        // Pravidlo 33: <STMT_NEXT> -> ; <STMT> <STMT_NEXT>
         if ((err = compare_token(parser, TOKEN_SE_SEMICOLON)) != ERR_OK)
             return err;
         
@@ -1008,16 +1037,23 @@ ErrorCode stmt_next(Parser *parser, AstNode ***statements_out, int *count_out) {
         
         if ((err = stmt_next(parser, statements_out, count_out)) != ERR_OK)
             return err;
+    } else {
+        // Pravidlo 34: <STMT_NEXT> -> ε
     }
 
     return ERR_OK;
 }
 
+
+// =============================================================================================================================
+//                                              STMT (Pravidlá 35, 36, 37, 38, 39, 40, 48, 57)
+// =============================================================================================================================
 ErrorCode stmt(Parser *parser, AstNode **first_stmt) {
 	ErrorCode err = ERR_OK;
 
 	if (parser->current_token.type == TOKEN_KW_VAL || parser->current_token.type == TOKEN_KW_VAR) {
-		int is_mutable = (parser->current_token.type == TOKEN_KW_VAR);
+		// Pravidlá 35, 36: <STMT> -> val / var id <D_TYPE> = <VAL>
+        int is_mutable = (parser->current_token.type == TOKEN_KW_VAR);
 
 		if ((err = compare_token(parser, parser->current_token.type)) != ERR_OK)
 			return err;
@@ -1067,7 +1103,8 @@ ErrorCode stmt(Parser *parser, AstNode **first_stmt) {
 		free(var_name);
 
 	} else if (parser->current_token.type == TOKEN_KW_WHILE) {
-		DataType cond_type;
+		// Pravidlo 37: <STMT> -> while <EXP> do EOL INDENT <F_BODY> DEDENT
+        DataType cond_type;
         AstNode *cond_node = NULL;
         AstNode *body_node = NULL;
         
@@ -1104,14 +1141,16 @@ ErrorCode stmt(Parser *parser, AstNode **first_stmt) {
         *first_stmt = ast_new_while(cond_node, body_node, parser->current_token.line, parser->current_token.column);
 
 	} else if (parser->current_token.type == TOKEN_KW_RETURN) {
+        // Pravidlo 38: <STMT> -> return <RET_VAL>
         if ((err = compare_token(parser, TOKEN_KW_RETURN)) != ERR_OK)
             return err;
 
         if ((err = ret_val(parser, parser->current_ret_type, first_stmt)) != ERR_OK)
             return err;
 
-    }else if (parser->current_token.type == TOKEN_ID_IDENT) {
-		DataType expr_type;
+    } else if (parser->current_token.type == TOKEN_ID_IDENT) {
+		// Pravidlo 39: <STMT> -> id <DEC>
+        DataType expr_type;
 		if ((err = parse_expr(parser, first_stmt, &expr_type)) != ERR_OK) {
 			return err;
 		}
@@ -1128,15 +1167,18 @@ ErrorCode stmt(Parser *parser, AstNode **first_stmt) {
 			}
 		}
 	} else if (parser->current_token.type == TOKEN_KW_IF) {
-		if ((err = if_stmt_all(parser, &first_stmt)) != ERR_OK)
+		// Pravidlo 48: <STMT> -> <IF_STMT_ALL>
+        if ((err = if_stmt_all(parser, &first_stmt)) != ERR_OK)
 			return err;
 
 	} else if (parser->current_token.type == TOKEN_KW_FOR) {
-		if ((err = for_stmt(parser, &first_stmt)) != ERR_OK)
+		// Pravidlo 57: <STMT> -> <FOR_STMT>
+        if ((err = for_stmt(parser, &first_stmt)) != ERR_OK)
 			return err;
 
 	} else {
-		DataType dummy_type;
+		// Pravidlo 40: <STMT> -> <OTHER_EXP>
+        DataType dummy_type;
 		if ((err = parse_expr(parser, first_stmt, &dummy_type)) != ERR_OK) {
 			return err;
 		}
@@ -1145,18 +1187,23 @@ ErrorCode stmt(Parser *parser, AstNode **first_stmt) {
 	return ERR_OK;
 }
 
+
+// =============================================================================================================================
+//                                              IF_STMT_ALL (Pravidlá 49, 50, 51)
+// =============================================================================================================================
 ErrorCode if_stmt_all(Parser *parser, AstNode **out_node) {
     ErrorCode err = ERR_OK;
     DataType cond_type;
     AstNode *cond_node = NULL;
     AstNode *then_body = NULL;
-    AstNode *else_body = NULL; // Prípadne naplnené cez if_next
+    AstNode *else_body = NULL;
 
     if (parser->current_token.type == TOKEN_KW_IF) {
         if ((err = compare_token(parser, TOKEN_KW_IF)) != ERR_OK)
             return err;
     }
 
+    // Pravidlo 49: <IF_STMT_ALL> -> if <EXP> then EOL INDENT <F_BODY> DEDENT <IF_NEXT>
     if ((err = parse_expr(parser, &cond_node, &cond_type)) != ERR_OK)
         return err;
     if (cond_type != TYPE_BOOLEAN) {
@@ -1171,7 +1218,6 @@ ErrorCode if_stmt_all(Parser *parser, AstNode **out_node) {
         }
     }
 
-    // Spracovanie tela if vetvy (blok alebo jeden príkaz)
     if (parser->current_token.type == TOKEN_EOL) {
         if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK) {
             ast_free(cond_node);
@@ -1206,7 +1252,6 @@ ErrorCode if_stmt_all(Parser *parser, AstNode **out_node) {
         }
     }
 
- 
     if ((err = if_next(parser, &else_body)) != ERR_OK) {
         ast_free(cond_node);
         ast_free(then_body);
@@ -1218,28 +1263,41 @@ ErrorCode if_stmt_all(Parser *parser, AstNode **out_node) {
     return ERR_OK;
 }
 
+
+// =============================================================================================================================
+//                                              IF_NEXT (Pravidlá 50, 51)
+// =============================================================================================================================
 ErrorCode if_next(Parser *parser, AstNode **out_node) {
     ErrorCode err = ERR_OK;
     *out_node = NULL;
 
     if (parser->current_token.type == TOKEN_KW_ELSE) {
+        // Pravidlo 50: <IF_NEXT> -> else <ELSE_NEXT>
         if ((err = compare_token(parser, TOKEN_KW_ELSE)) != ERR_OK)
             return err;
         if ((err = else_next(parser, out_node)) != ERR_OK)
             return err;
+    } else {
+        // Pravidlo 51: <IF_NEXT> -> ε
     }
 
     return ERR_OK;
 }
 
+
+// =============================================================================================================================
+//                                              ELSE_NEXT (Pravidlá 52, 53)
+// =============================================================================================================================
 ErrorCode else_next(Parser *parser, AstNode **out_node) {
     ErrorCode err = ERR_OK;
     *out_node = NULL;
 
     if (parser->current_token.type == TOKEN_KW_IF) {
+        // Pravidlo 52: <ELSE_NEXT> -> <IF_STMT_ALL>
         if ((err = if_stmt_all(parser, out_node)) != ERR_OK)
             return err;
     } else if (parser->current_token.type == TOKEN_EOL) {
+        // Pravidlo 53: <ELSE_NEXT> -> EOL INDENT <F_BODY> DEDENT
         if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK)
             return err;
         if (parser->current_token.type == TOKEN_INDENT) {
@@ -1263,6 +1321,10 @@ ErrorCode else_next(Parser *parser, AstNode **out_node) {
     return ERR_OK;
 }
 
+
+// =============================================================================================================================
+//                                              IF_CONTROL (Pravidlo 54)
+// =============================================================================================================================
 ErrorCode if_control(Parser *parser, AstNode **out_node) {
     ErrorCode err = ERR_OK;
     DataType cond_type;
@@ -1276,6 +1338,7 @@ ErrorCode if_control(Parser *parser, AstNode **out_node) {
             return err;
     }
 
+    // Pravidlo 54: <IF_CONTROL> -> if <EXP> then <IF_CONTROL_NEXT> else <IF_CONTROL_NEXT>
     if ((err = parse_expr(parser, &cond_node, &cond_type)) != ERR_OK)
         return err;
         
@@ -1291,7 +1354,6 @@ ErrorCode if_control(Parser *parser, AstNode **out_node) {
         }
     }
 
-    // Spracovanie 'then' bloku/príkazu cez if_control_next
     if ((err = if_control_next(parser, &then_body)) != ERR_OK) {
         ast_free(cond_node);
         return err;
@@ -1305,7 +1367,6 @@ ErrorCode if_control(Parser *parser, AstNode **out_node) {
         }
     }
 
-
     if ((err = if_control_next(parser, &else_body)) != ERR_OK) {
         ast_free(cond_node);
         ast_free(then_body);
@@ -1318,13 +1379,16 @@ ErrorCode if_control(Parser *parser, AstNode **out_node) {
 }
 
 
-
+// =============================================================================================================================
+//                                              IF_CONTROL_NEXT (Pravidlá 55, 56)
+// =============================================================================================================================
 ErrorCode if_control_next(Parser *parser, AstNode **out_node) {
     ErrorCode err = ERR_OK;
     DataType dummy_type;
     *out_node = NULL;
 
     if (parser->current_token.type == TOKEN_EOL) {
+        // Pravidlo 56: <IF_CONTROL_NEXT> -> EOL INDENT <F_BODY> DEDENT
         if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK)
             return err;
             
@@ -1344,7 +1408,7 @@ ErrorCode if_control_next(Parser *parser, AstNode **out_node) {
             }
         }
     } else {
-
+        // Pravidlo 55: <IF_CONTROL_NEXT> -> <VAL>
         if ((err = parse_expr(parser, out_node, &dummy_type)) != ERR_OK)
             return err;
     }
@@ -1352,11 +1416,16 @@ ErrorCode if_control_next(Parser *parser, AstNode **out_node) {
     return ERR_OK;
 }
 
+
+// =============================================================================================================================
+//                                              FOR_STMT (Pravidlo 58)
+// =============================================================================================================================
 ErrorCode for_stmt(Parser *parser, AstNode **out_node) {
     ErrorCode err = ERR_OK;
     *out_node = NULL;
 
     if (parser->current_token.type == TOKEN_KW_FOR) {
+        // Pravidlo 58: <FOR_STMT> -> for <FOR_CONTENT>
         if ((err = compare_token(parser, TOKEN_KW_FOR)) != ERR_OK)
             return err;
     }
@@ -1366,6 +1435,11 @@ ErrorCode for_stmt(Parser *parser, AstNode **out_node) {
 
     return ERR_OK;
 }
+
+
+// =============================================================================================================================
+//                                              FOR_CONTENT (Pravidlá 59, 60)
+// =============================================================================================================================
 ErrorCode for_content(Parser *parser, AstNode **out_node) {
     ErrorCode err = ERR_OK;
     *out_node = NULL;
@@ -1379,9 +1453,8 @@ ErrorCode for_content(Parser *parser, AstNode **out_node) {
     int guard_count = 0;
     AstNode *body_node = NULL;
 
-    // Rozdelenie podla gramatiky (Pravidlo 59 vs Pravidlo 60)
     if (parser->current_token.type == TOKEN_EOL) {
-        // --- PRAVIDLO 60: <FOR_CONTENT> -> EOL INDENT <GENERATOR> <EOL_GUARDS> DEDENT do <FOR_BODY> ---
+        // Pravidlo 60: <FOR_CONTENT> -> EOL INDENT <GENERATOR> <EOL_GUARDS> DEDENT do <FOR_BODY>
         if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK)
             return err;
 
@@ -1392,11 +1465,9 @@ ErrorCode for_content(Parser *parser, AstNode **out_node) {
             PARSER_ERR("for_content");
         }
 
-        // --- PRAVIDLO 61: <GENERATOR> -> id <- <EXP> <RANGE> <EXP> <OPT_STEP> ---
         if ((err = generator(parser, &var_name, &from_node, &to_node, &is_until, &step_node)) != ERR_OK)
             return err;
 
-        // --- PRAVIDLO 68: <EOL_GUARDS> -> EOL if <EXP> <EOL_GUARDS> ---
         if ((err = eol_guards(parser, &guards, &guard_count)) != ERR_OK) {
             free(var_name);
             ast_free(from_node);
@@ -1418,13 +1489,10 @@ ErrorCode for_content(Parser *parser, AstNode **out_node) {
         }
 
     } else {
-        // --- PRAVIDLO 59: <FOR_CONTENT> -> <GENERATOR> <OPT_GUARDS> do <FOR_BODY> ---
-        
-        // --- PRAVIDLO 61: <GENERATOR> -> id <- <EXP> <RANGE> <EXP> <OPT_STEP> ---
+        // Pravidlo 59: <FOR_CONTENT> -> <GENERATOR> <OPT_GUARDS> do <FOR_BODY>
         if ((err = generator(parser, &var_name, &from_node, &to_node, &is_until, &step_node)) != ERR_OK)
             return err;
 
-        // --- PRAVIDLO 66: <OPT_GUARDS> -> if <EXP> <OPT_GUARDS> ---
         if ((err = opt_guards(parser, &guards, &guard_count)) != ERR_OK) {
             free(var_name);
             ast_free(from_node);
@@ -1434,7 +1502,6 @@ ErrorCode for_content(Parser *parser, AstNode **out_node) {
         }
     }
 
-    // --- KĽÚČOVÉ SLOVO DO ---
     if (parser->current_token.type == TOKEN_KW_DO) {
         if ((err = compare_token(parser, TOKEN_KW_DO)) != ERR_OK) {
             free(var_name);
@@ -1449,10 +1516,8 @@ ErrorCode for_content(Parser *parser, AstNode **out_node) {
         PARSER_ERR("for_content");
         for (int i = 0; i < guard_count; i++) ast_free(guards[i]);
         free(guards);
-
     }
 
-    // --- PRAVIDLÁ 70-71: <FOR_BODY> ---
     if ((err = for_body(parser, &body_node)) != ERR_OK) {
         free(var_name);
         ast_free(from_node);
@@ -1463,7 +1528,6 @@ ErrorCode for_content(Parser *parser, AstNode **out_node) {
         return err;
     }
 
-    // --- VYTVORENIE FINÁLNEGO AST UZLA ---
     *out_node = ast_new_for(var_name, from_node, to_node, is_until, step_node, guards, guard_count, body_node, parser->current_token.line, parser->current_token.column);
 
     free(guards);
@@ -1471,6 +1535,10 @@ ErrorCode for_content(Parser *parser, AstNode **out_node) {
     return ERR_OK;
 }
 
+
+// =============================================================================================================================
+//                                              GENERATOR (Pravidlo 61)
+// =============================================================================================================================
 ErrorCode generator(Parser *parser, char **out_var_name, AstNode **out_from, AstNode **out_to, bool *out_is_until, AstNode **out_step) {
     ErrorCode err = ERR_OK;
     DataType start_type, end_type;
@@ -1480,7 +1548,7 @@ ErrorCode generator(Parser *parser, char **out_var_name, AstNode **out_from, Ast
     *out_step = NULL;
     *out_is_until = false;
 
-    // --- PRAVIDLO 61: <GENERATOR> -> id <- <EXP> <RANGE> <EXP> <OPT_STEP> ---
+    // Pravidlo 61: <GENERATOR> -> id <- <EXP> <RANGE> <EXP> <OPT_STEP>
     if (parser->current_token.type != TOKEN_ID_IDENT) {
         PARSER_ERR("generator");
     }
@@ -1500,7 +1568,6 @@ ErrorCode generator(Parser *parser, char **out_var_name, AstNode **out_from, Ast
         free(*out_var_name);
         *out_var_name = NULL;
         PARSER_ERR("generator");
-
     }
     if ((err = compare_token(parser, TOKEN_SE_LARROW)) != ERR_OK) {
         free(*out_var_name);
@@ -1521,7 +1588,6 @@ ErrorCode generator(Parser *parser, char **out_var_name, AstNode **out_from, Ast
         return ERR_SEMANTIC_TYPE;
     }
 
-    // --- PRAVIDLÁ 62-63: <RANGE> -> to / until (voláme range_func) ---
     if ((err = range_func(parser, out_is_until)) != ERR_OK) {
         free(*out_var_name);
         *out_var_name = NULL;
@@ -1547,7 +1613,6 @@ ErrorCode generator(Parser *parser, char **out_var_name, AstNode **out_from, Ast
         return ERR_SEMANTIC_TYPE;
     }
 
-    // --- PRAVIDLÁ 64-65: <OPT_STEP> ---
     if ((err = opt_step(parser, out_step)) != ERR_OK) {
         free(*out_var_name);
         *out_var_name = NULL;
@@ -1561,32 +1626,41 @@ ErrorCode generator(Parser *parser, char **out_var_name, AstNode **out_from, Ast
     return ERR_OK;
 }
 
+
+// =============================================================================================================================
+//                                              RANGE_FUNC (Pravidlá 62, 63)
+// =============================================================================================================================
 ErrorCode range_func(Parser *parser, bool *is_until) {
     ErrorCode err = ERR_OK;
 
-
     if (parser->current_token.type == TOKEN_KW_TO) {
+        // Pravidlo 62: <RANGE> -> to
         if ((err = compare_token(parser, TOKEN_KW_TO)) != ERR_OK)
             return err;
         *is_until = false;
     } else if (parser->current_token.type == TOKEN_KW_UNTIL) {
+        // Pravidlo 63: <RANGE> -> until
         if ((err = compare_token(parser, TOKEN_KW_UNTIL)) != ERR_OK)
             return err;
         *is_until = true;
     } else {
         PARSER_ERR("range_func");
-
     }
 
     return ERR_OK;
 }
+
+
+// =============================================================================================================================
+//                                              OPT_STEP (Pravidlá 64, 65)
+// =============================================================================================================================
 ErrorCode opt_step(Parser *parser, AstNode **out_node) {
     ErrorCode err = ERR_OK;
     DataType step_type;
     *out_node = NULL;
 
-    // --- PRAVIDLÁ 64-65: <OPT_STEP> -> by <EXP> | epsilon ---
     if (parser->current_token.type == TOKEN_KW_BY) {
+        // Pravidlo 64: <OPT_STEP> -> by <EXP>
         if ((err = compare_token(parser, TOKEN_KW_BY)) != ERR_OK)
             return err;
             
@@ -1598,17 +1672,23 @@ ErrorCode opt_step(Parser *parser, AstNode **out_node) {
             *out_node = NULL;
             return ERR_SEMANTIC_TYPE;
         }
+    } else {
+        // Pravidlo 65: <OPT_STEP> -> ε
     }
 
     return ERR_OK;
 }
 
+
+// =============================================================================================================================
+//                                              OPT_GUARDS (Pravidlá 66, 67)
+// =============================================================================================================================
 ErrorCode opt_guards(Parser *parser, AstNode ***guards_out, int *count_out) {
     ErrorCode err = ERR_OK;
     *guards_out = NULL;
     *count_out = 0;
 
-    // --- PRAVIDLÁ 66-67: <OPT_GUARDS> -> if <EXP> <OPT_GUARDS> | epsilon ---
+    // Pravidlá 66, 67: <OPT_GUARDS> -> if <EXP> <OPT_GUARDS> | epsilon
     while (parser->current_token.type == TOKEN_KW_IF) {
         if ((err = compare_token(parser, TOKEN_KW_IF)) != ERR_OK) {
             for (int i = 0; i < *count_out; i++) ast_free((*guards_out)[i]);
@@ -1646,12 +1726,16 @@ ErrorCode opt_guards(Parser *parser, AstNode ***guards_out, int *count_out) {
     return ERR_OK;
 }
 
+
+// =============================================================================================================================
+//                                              EOL_GUARDS (Pravidlá 68, 69)
+// =============================================================================================================================
 ErrorCode eol_guards(Parser *parser, AstNode ***guards_out, int *count_out) {
     ErrorCode err = ERR_OK;
     *guards_out = NULL;
     *count_out = 0;
 
-    // --- PRAVIDLÁ 68-69: <EOL_GUARDS> -> EOL if <EXP> <EOL_GUARDS> | epsilon ---
+    // Pravidlá 68, 69: <EOL_GUARDS> -> EOL if <EXP> <EOL_GUARDS> | epsilon
     while (parser->current_token.type == TOKEN_EOL) {
         if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK) {
             for (int i = 0; i < *count_out; i++) ast_free((*guards_out)[i]);
@@ -1699,12 +1783,16 @@ ErrorCode eol_guards(Parser *parser, AstNode ***guards_out, int *count_out) {
     return ERR_OK;
 }
 
+
+// =============================================================================================================================
+//                                              FOR_BODY (Pravidlá 70, 71)
+// =============================================================================================================================
 ErrorCode for_body(Parser *parser, AstNode **out_node) {
     ErrorCode err = ERR_OK;
     *out_node = NULL;
 
     if (parser->current_token.type == TOKEN_EOL) {
-        // --- PRAVIDLO 71: <FOR_BODY> -> EOL INDENT <F_BODY> DEDENT ---
+        // Pravidlo 71: <FOR_BODY> -> EOL INDENT <F_BODY> DEDENT
         if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK)
             return err;
 
@@ -1726,7 +1814,7 @@ ErrorCode for_body(Parser *parser, AstNode **out_node) {
             }
         } 
     } else {
-        // --- PRAVIDLO 70: <FOR_BODY> -> <STMT> ---
+        // Pravidlo 70: <FOR_BODY> -> <STMT>
         if ((err = stmt(parser, out_node)) != ERR_OK)
             return err;
     }
@@ -1734,6 +1822,10 @@ ErrorCode for_body(Parser *parser, AstNode **out_node) {
     return ERR_OK;
 }
 
+
+// =============================================================================================================================
+//                                              EXP_CONT & PARSE_EXPR (Výrazy)
+// =============================================================================================================================
 ErrorCode exp_cont(Parser *parser, DataType left_type, DataType *out_type) {
 	ErrorCode err = ERR_OK;
 	TokenType t = parser->current_token.type;
@@ -1765,12 +1857,18 @@ ErrorCode exp_cont(Parser *parser, DataType left_type, DataType *out_type) {
 ErrorCode parse_expr(Parser *parser, AstNode **out_node, DataType *out_type) {
 	ErrorCode err = ERR_OK;
 	DataType left_type;
-	if ((err = val(parser, &left_type)) != ERR_OK)
+	if ((err = val(parser, out_node, &left_type)) != ERR_OK)
 		return err;
 	return exp_cont(parser, left_type, out_type);
 }
 
-ErrorCode type_func(Parser *parser, DataType *out_type) { return type(parser, out_type); }
+
+// =============================================================================================================================
+//                                              TYPE_FUNC & FREE
+// =============================================================================================================================
+ErrorCode type_func(Parser *parser, DataType *out_type) { 
+    return type(parser, out_type); 
+}
 
 void parser_free(Parser *parser) {
 	if (parser != NULL) {
