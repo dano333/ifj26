@@ -12,6 +12,7 @@
 #include "token.h"
 #include "symtable.h"
 #include <stdbool.h>
+#include "ast.h"
 
 typedef struct {
 	Scanner *scanner;

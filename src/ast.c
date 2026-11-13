@@ -33,7 +33,7 @@ void block_append(AstBlock *block, AstNode *stmt) {
         int new_cap = (block->capacity == 0) ? 4 : block->capacity * 2;
         AstNode **new_stmts = realloc(block->statements, new_cap * sizeof(AstNode *));
         if (!new_stmts) {
-            return false;
+            return;
         }
 
         block->statements = new_stmts;
@@ -76,7 +76,7 @@ AstNode *ast_new_literal_string(char *val, int line, int col) {
 AstNode *ast_new_literal_bool(bool val, int line, int col) {
     AstNode *node = ast_alloc(NODE_LIT_BOOL, line, col);
     if (!node) return NULL;
-    node->type = TYPE_BOOL;
+    node->type = TYPE_BOOLEAN;
     node->ast.literal.bool_val = val;
     return node;
 }

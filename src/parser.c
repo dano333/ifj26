@@ -6,7 +6,7 @@
 
 #include "parser.h"
 #include "error.h"
-#include "ast.c"
+
 #include "semantics.h"
 #include <stdbool.h>
 #include <stdio.h>
@@ -42,6 +42,16 @@ ErrorCode compare_token(Parser *parser, TokenType expected) {
 	} else {
 		PARSER_ERR("compare_token");
 	}
+}
+
+AstNode *ast_new_return(AstNode *expr, int line, int col) {
+    AstNode *node = malloc(sizeof(AstNode));
+    if (!node) return NULL;
+    node->kind = NODE_RETURN;
+    node->line = line;
+    node->column = col;
+    node->ast.expr_stmt.child = expr; // Prípadne expr_stmt podľa štruktúry v tvojej unii pre NODE_RETURN
+    return node;
 }
 
 static bool is_f_def(TokenType type) { return (type == TOKEN_KW_DEF || type == TOKEN_SE_AT); }
@@ -1839,8 +1849,11 @@ ErrorCode exp_cont(Parser *parser, DataType left_type, DataType *out_type) {
 			return err;
 
 		DataType right_type;
-		if ((err = val(parser, &right_type)) != ERR_OK)
-			return err;
+        AstNode *right_node = NULL; 
+        if ((err = val(parser, &right_node, &right_type)) != ERR_OK) { 
+            ast_free(right_node);
+            return err;
+        }
 
 		DataType res_type = get_binary_op_type(left_type, right_type, op);
 		if (res_type == TYPE_UNKNOWN) {

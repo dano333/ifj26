@@ -8,6 +8,7 @@
 #define AST_H
 
 #include <stdbool.h>
+#include "symtable.h"
 
 
 typedef struct AstNode AstNode;
@@ -64,14 +65,6 @@ typedef enum {
     OP_NOT    // !a
 } OpType;
 
-typedef enum {
-    TYPE_UNKNOWN = 0, 
-    TYPE_INT,         
-    TYPE_DOUBLE,      
-    TYPE_STRING,      
-    TYPE_BOOL,        
-    TYPE_UNIT         
-} DataType;
 
 struct AstBlock {
     AstNode **statements; 

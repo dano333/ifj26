@@ -1,50 +1,62 @@
 /*
- * Project: IFJ26
- * Authors: Daniel Roth (xrothda00)
- * Description: Starts whole translator
+- Project: IFJ26
+- Authors: Daniel Roth (xrothda00)
+- Description: Starts whole translator
  */
 
-#include "builtins.h"
 #include "error.h"
-#include "parser.h"
 #include "scanner.h"
-#include "symtable.h"
+#include "parser.h"
+#include "ast.h"
 #include <stdio.h>
+#include "symtable.h"
 
 int main(void) {
-	SymTable global_table;
-	symtable_init(&global_table, NULL);
+    // Before scanner starts
+    Scanner scanner;
+    ErrorCode err = scanner_init(&scanner);
+    if (err != ERR_OK) {
+        return err;
+    }
+	ErrorCode register_builtins(SymTable *table);
 
-	// Pre-register IFJ26 standard built-in functions
-	if (register_builtins(&global_table) != ERR_OK) {
-		fprintf(stderr, "Failed to register built-in functions.\n");
-		symtable_free(&global_table);
-		return ERR_INTERNAL_COMPILER;
-	}
+    // Parser init & global symbol table
+    Parser parser;
+    SymTable global_table;
+    symtable_init(&global_table, NULL); 
 
-	Scanner scanner;
-	if (scanner_init(&scanner) != ERR_OK) {
-		symtable_free(&global_table);
-		return 1;
-	}
+    // Pre-register IFJ26 standard built-in functions
+    if (register_builtins(&global_table) != ERR_OK) {
+        fprintf(stderr, "Failed to register built-in functions.\n");
+        symtable_free(&global_table);
+        scanner_free(&scanner);
+        return ERR_INTERNAL_COMPILER;
+    }
+    
+    err = parser_init(&parser, &scanner, &global_table);
+    if (err != ERR_OK) {
+        symtable_free(&global_table);
+        scanner_free(&scanner);
+        return err;
+    }
 
-	Parser parser;
-	if (parser_init(&parser, &scanner, &global_table) != ERR_OK) {
-		scanner_free(&scanner);
-		symtable_free(&global_table);
-		return 1;
-	}
+    // Koreňový uzol pre celý AST strom programu
+    AstNode *program_node = NULL;
+    err = prolog(&parser, &program_node);
 
-	// Run the top-level grammar rule
-	ErrorCode err = prolog(&parser);
-	if (err == ERR_OK) {
-		printf("\n[SUCCESS] Parsing & basic semantic setup completed!\n");
-	} else {
-		fprintf(stderr, "\n[ERROR] Compilation failed with error code %d\n", err);
-	}
+    if (err == ERR_OK) {
+        printf("Jej ide to\n");
+        
+        // Tu môžeš spustiť sémantiku / generovanie kódu nad program_node
+        
+        ast_free(program_node);
+    } else {
+        printf("Ultra mega sad\n");
+    }
 
-	parser_free(&parser);
-	scanner_free(&scanner);
-	symtable_free(&global_table);
-	return err;
+    // Cleanup
+    symtable_free(&global_table);
+    parser_free(&parser);
+    scanner_free(&scanner);
+    return ERR_OK;
 }
