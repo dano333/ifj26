@@ -12,6 +12,8 @@
 #include "string_buffer.h"
 #include "token.h"
 
+typedef enum { INTERP_NONE, INTERP_TEXT_SINGLE, INTERP_TEXT_MULTI, INTERP_EXPR_SINGLE, INTERP_EXPR_MULTI } InterpType;
+
 typedef struct {
 	StringBuffer buffer;
 	int line;
@@ -20,7 +22,8 @@ typedef struct {
 	IndentStack indent_stack;
 	int pending_dedents;
 	int paren_depth;
-
+	InterpType interp_state;
+	int pending_interp_end;
 } Scanner;
 
 /**
