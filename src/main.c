@@ -46,7 +46,6 @@ int main(void) {
 
     if (err == ERR_OK) {
         printf("Jej ide to\n");
-        
         // Tu môžeš spustiť sémantiku / generovanie kódu nad program_node
         
         ast_free(program_node);

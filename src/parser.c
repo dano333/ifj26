@@ -44,15 +44,7 @@ ErrorCode compare_token(Parser *parser, TokenType expected) {
 	}
 }
 
-AstNode *ast_new_return(AstNode *expr, int line, int col) {
-    AstNode *node = malloc(sizeof(AstNode));
-    if (!node) return NULL;
-    node->kind = NODE_RETURN;
-    node->line = line;
-    node->column = col;
-    node->ast.expr_stmt.child = expr; // Prípadne expr_stmt podľa štruktúry v tvojej unii pre NODE_RETURN
-    return node;
-}
+
 
 static bool is_f_def(TokenType type) { return (type == TOKEN_KW_DEF || type == TOKEN_SE_AT); }
 
@@ -242,9 +234,9 @@ ErrorCode f_def(Parser *parser, AstNode **func_node) {
 		return err;
 	}
 
-	*func_node = ast_new_func_def(func_name, NULL, 0, NULL, 0, true, ret_type, body_node,false, parser->current_token.line, parser->current_token.column);
+	*func_node = ast_new_func_def(func_name, params, param_count, NULL, 0, true, ret_type, body_node, false, parser->current_token.line, parser->current_token.column);
+    
     free(func_name);
-
 	parser->current_scope = func_scope.parent;
 	symtable_free(&func_scope);
 
@@ -341,8 +333,11 @@ ErrorCode extension(Parser *parser, AstNode **ext_node) {
     }
 
 
-    AstNode *body_node = NULL;
-    if ((err = e_body(parser, &body_node)) != ERR_OK) {
+    AstNode **methods = NULL;
+    int method_count = 0, method_capacity = 0;
+    if ((err = e_body(parser, &methods, &method_count, &method_capacity)) != ERR_OK) {
+        for (int i = 0; i < method_count; i++) ast_free(methods[i]);
+        free(methods);
         parser->current_scope = ext_scope.parent;
         symtable_free(&ext_scope);
         free(ext_name);
@@ -350,14 +345,15 @@ ErrorCode extension(Parser *parser, AstNode **ext_node) {
     }
 
     if ((err = compare_token(parser, TOKEN_DEDENT)) != ERR_OK) {
+        for (int i = 0; i < method_count; i++) ast_free(methods[i]);
+        free(methods);
         parser->current_scope = ext_scope.parent;
         symtable_free(&ext_scope);
         free(ext_name);
         return err;
     }
 
-    *ext_node = ast_new_extension(ext_name, dummy_type, body_node, 0, parser->current_token.line, parser->current_token.column);
-    free(ext_name);
+    *ext_node = ast_new_extension(ext_name, dummy_type, methods, method_count, parser->current_token.line, parser->current_token.column);free(ext_name);
 
     parser->current_scope = ext_scope.parent;
     symtable_free(&ext_scope);
@@ -369,7 +365,7 @@ ErrorCode extension(Parser *parser, AstNode **ext_node) {
 // =============================================================================================================================
 //                                              E_BODY (Pravidlo 15)
 // =============================================================================================================================
-ErrorCode e_body(Parser *parser, AstNode **ext_body_node) {
+ErrorCode e_body(Parser *parser, AstNode ***methods, int *count, int *capacity) {
     ErrorCode err = ERR_OK;
     DataType dummy_type;
 
@@ -413,52 +409,35 @@ ErrorCode e_body(Parser *parser, AstNode **ext_body_node) {
     }
 
 
-    *ext_body_node = ast_new_func_def(func_name, params, param_count, NULL, 0, true, dummy_type, body_block, false, parser->current_token.line, parser->current_token.column);
-
+    AstNode *func_node = ast_new_func_def(func_name, params, param_count, NULL, 0, true, dummy_type, body_block, false, parser->current_token.line, parser->current_token.column);
     free(func_name);
+    if (!func_node) return ERR_NOMEM;
 
-	AstNode **funcs = NULL;
-	int func_count = 0;
-	int func_capacity = 0;
-	if ((err = eb_next(parser, &funcs, &func_count, &func_capacity)) != ERR_OK)
-        return err;
+    if (*count >= *capacity) {
+        int new_cap = (*capacity == 0) ? 4 : *capacity * 2;
+        AstNode **tmp = realloc(*methods, new_cap * sizeof(AstNode *));
+        if (!tmp) {
+            ast_free(func_node);
+            return ERR_NOMEM;
+        }
+        *methods = tmp;
+        *capacity = new_cap;
+    }
+    (*methods)[(*count)++] = func_node;
 
-    return ERR_OK;
+    return eb_next(parser, methods, count, capacity);
 }
 
 
 // =============================================================================================================================
 //                                              EB_NEXT (Pravidlá 16, 17)
 // =============================================================================================================================
-ErrorCode eb_next(Parser *parser, AstNode ***funcs, int *func_count, int *func_capacity) {
-    ErrorCode err = ERR_OK;
-
+ErrorCode eb_next(Parser *parser, AstNode ***methods, int *count, int *capacity) {
     if (parser->current_token.type == TOKEN_KW_DEF) {
         // Pravidlo 16: <EB_NEXT> -> <E_BODY>
-        AstNode *func_node = NULL;
-        
-        if ((err = e_body(parser, &func_node)) != ERR_OK) {
-            return err;
-        }
-        
-        if (*func_count >= *func_capacity) {
-            int new_capacity = (*func_capacity == 0) ? 4 : (*func_capacity * 2);
-            AstNode **new_funcs = realloc(*funcs, new_capacity * sizeof(AstNode *));
-            if (!new_funcs) {
-                ast_free(func_node); 
-                return ERR_NOMEM;
-            }
-            *funcs = new_funcs;
-            *func_capacity = new_capacity;
-        }
-
-        (*funcs)[*func_count] = func_node;
-        (*func_count)++;
-		
-    } else {
-        // Pravidlo 17: <EB_NEXT> -> ε
+        return e_body(parser, methods, count, capacity);
     }
-
+    // Pravidlo 17: <EB_NEXT> -> ε
     return ERR_OK;
 }
 
@@ -555,7 +534,6 @@ ErrorCode data_type(Parser *parser, DataType *out_type) {
 // =============================================================================================================================
 ErrorCode f_body_end(Parser *parser, AstNode **body_node) {
     ErrorCode err = ERR_OK;
-    DataType dummy_type;
 
     while (parser->current_token.type == TOKEN_EOL) {
         if ((err = compare_token(parser, TOKEN_EOL)) != ERR_OK)
@@ -1096,7 +1074,7 @@ ErrorCode stmt(Parser *parser, AstNode **first_stmt) {
 		}
 
 		DataType expr_type;
-		if ((err = parse_expr(parser, &first_stmt, &expr_type)) != ERR_OK) {
+		if ((err = parse_expr(parser, first_stmt, &expr_type)) != ERR_OK) {
 			free(var_name);
 			return err;
 		}
@@ -1178,12 +1156,12 @@ ErrorCode stmt(Parser *parser, AstNode **first_stmt) {
 		}
 	} else if (parser->current_token.type == TOKEN_KW_IF) {
 		// Pravidlo 48: <STMT> -> <IF_STMT_ALL>
-        if ((err = if_stmt_all(parser, &first_stmt)) != ERR_OK)
+        if ((err = if_stmt_all(parser, first_stmt)) != ERR_OK)
 			return err;
 
 	} else if (parser->current_token.type == TOKEN_KW_FOR) {
 		// Pravidlo 57: <STMT> -> <FOR_STMT>
-        if ((err = for_stmt(parser, &first_stmt)) != ERR_OK)
+        if ((err = for_stmt(parser, first_stmt)) != ERR_OK)
 			return err;
 
 	} else {

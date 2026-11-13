@@ -25,8 +25,8 @@ ErrorCode f_list(Parser *parser, AstNode ***functions, int *func_count, AstNode 
 ErrorCode f_def(Parser *parser, AstNode **func_node);
 ErrorCode anotacia(Parser *parser);
 ErrorCode extension(Parser *parser, AstNode **ext_node);
-ErrorCode e_body(Parser *parser, AstNode **ext_body_node);
-ErrorCode eb_next(Parser *parser, AstNode ***funcs, int *func_count, int *func_capacity);
+ErrorCode e_body(Parser *parser, AstNode ***methods, int *count, int *capacity);
+ErrorCode eb_next(Parser *parser, AstNode ***methods, int *count, int *capacity);
 ErrorCode parameter(Parser *parser, AstNode **param_node, AstNode ***params, int *param_count);
 ErrorCode param_next(Parser *parser, AstNode ***params, int *param_count);
 ErrorCode param_tail(Parser *parser, AstNode ***params, int *param_count);

@@ -26,14 +26,15 @@ void block_init(AstBlock *block) {
     block->capacity = 0;
 }
 
-void block_append(AstBlock *block, AstNode *stmt) {
-    if (!block || !stmt) return;
+
+bool block_append(AstBlock *block, AstNode *stmt) {
+    if (!block || !stmt) return false;
 
     if (block->count >= block->capacity) {
         int new_cap = (block->capacity == 0) ? 4 : block->capacity * 2;
         AstNode **new_stmts = realloc(block->statements, new_cap * sizeof(AstNode *));
         if (!new_stmts) {
-            return;
+            return false; 
         }
 
         block->statements = new_stmts;
@@ -41,6 +42,7 @@ void block_append(AstBlock *block, AstNode *stmt) {
     }
 
     block->statements[block->count++] = stmt;
+    return true;
 }
 
 
@@ -92,6 +94,76 @@ AstNode *ast_new_identifier(char *name, int line, int col) {
     AstNode *node = ast_alloc(NODE_ID, line, col);
     if (!node) return NULL;
     node->ast.identifier.name = name;
+    return node;
+}
+
+// ==========================================
+// KONŠRUKTORY: VÝRAZY A PRÍKAZY
+// ==========================================
+
+
+AstNode *ast_new_unary(OpType op, AstNode *operand, int line, int col) {
+    AstNode *node = ast_alloc(NODE_UNARY_OP, line, col);
+    if (!node) return NULL;
+    node->ast.unary.op = op;
+    node->ast.unary.operand = operand;
+    return node;
+}
+
+
+AstNode *ast_new_binary(OpType op, AstNode *left, AstNode *right, int line, int col) {
+    AstNode *node = ast_alloc(NODE_BINARY_OP, line, col);
+    if (!node) return NULL;
+    node->ast.binary.op = op;
+    node->ast.binary.left = left;
+    node->ast.binary.right = right;
+    return node;
+}
+
+
+AstNode *ast_new_val_def(char *name, DataType declared_type, AstNode *initializer, int line, int col) {
+    AstNode *node = ast_alloc(NODE_VAL_DEF, line, col);
+    if (!node) return NULL;
+    node->type = declared_type;
+    node->ast.var_val.name = name;
+    node->ast.var_val.declared_type = declared_type;
+    node->ast.var_val.initializer = initializer;
+    return node;
+}
+
+
+AstNode *ast_new_var_def(char *name, DataType declared_type, AstNode *initializer, int line, int col) {
+    AstNode *node = ast_alloc(NODE_VAR_DEF, line, col);
+    if (!node) return NULL;
+    node->type = declared_type;
+    node->ast.var_val.name = name;
+    node->ast.var_val.declared_type = declared_type;
+    node->ast.var_val.initializer = initializer;
+    return node;
+}
+
+
+AstNode *ast_new_assign(char *name, AstNode *value, int line, int col) {
+    AstNode *node = ast_alloc(NODE_ASSIGN, line, col);
+    if (!node) return NULL;
+    node->ast.assign.name = name;
+    node->ast.assign.value = value;
+    return node;
+}
+
+
+AstNode *ast_new_expr_stmt(AstNode *expr, int line, int col) {
+    AstNode *node = ast_alloc(NODE_EXPR_STMT, line, col);
+    if (!node) return NULL;
+    node->ast.expr_stmt.child = expr;
+    return node;
+}
+
+
+AstNode *ast_new_return(AstNode *expr, int line, int col) {
+    AstNode *node = ast_alloc(NODE_RETURN, line, col);
+    if (!node) return NULL;
+    node->ast.expr_stmt.child = expr;
     return node;
 }
 
@@ -187,6 +259,7 @@ AstNode *ast_new_param(char *name, DataType type, int line, int col) {
     return node;
 }
 
+
 AstNode *ast_new_func_def(char *name, AstNode **params, int param_count, int *list_sizes, int list_count, bool has_parens, DataType return_type, AstNode *body, bool is_main, int line, int col) {
     AstNode *node = ast_alloc(NODE_FUNC_DEF, line, col);
     if (!node) return NULL;
@@ -210,6 +283,8 @@ AstNode *ast_new_block(AstNode **statements, int count, int capacity, int line, 
     node->ast.block_node.block.capacity = capacity;
     return node;
 }
+
+
 
 AstNode *ast_new_extension(char *receiver_name, DataType receiver_type, AstNode **methods, int method_count, int line, int col) {
     AstNode *node = ast_alloc(NODE_EXTENSION, line, col);

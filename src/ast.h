@@ -176,9 +176,7 @@ struct AstNode {
         } func_node;
 
         struct {
-            AstBlock block; 
-            int count;            
-            int capacity;          
+            AstBlock block;
         } block_node;
 
         struct {
@@ -202,6 +200,7 @@ struct AstNode {
 
     } ast;
 };
+
 
 
 AstNode *ast_new_literal_int(long long val, int line, int col);
@@ -236,7 +235,8 @@ AstNode *ast_new_program(AstNode **functions, int function_count, AstNode **exte
 
 
 void block_init(AstBlock *block);                  
-void block_append(AstBlock *block, AstNode *stmt);
+
+bool block_append(AstBlock *block, AstNode *stmt);
 void ast_free(AstNode *node);
 
-#endif 
+#endif
