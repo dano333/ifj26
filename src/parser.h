@@ -88,16 +88,6 @@ ErrorCode prolog(Parser *parser, AstNode **out_program_node);
  */
 ErrorCode compare_token(Parser *parser, TokenType expected);
 
-
-
-/**
- * Frees the parts in istring block
- * 
- * @param interp_free_parts structure
- */
-void interp_free_parts(AstNode **parts, int count);
-
-
 /**
  * Frees the parser
  * Frees the string buffer
@@ -105,5 +95,8 @@ void interp_free_parts(AstNode **parts, int count);
  * @param parser structure
  */
 void parser_free(Parser *parser);
+
+
+void interp_free_parts(AstNode **parts, int count);
 
 #endif

@@ -7,7 +7,6 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
-#include "string_buffer.h"
 
 typedef enum {
 	/*keywords*/
