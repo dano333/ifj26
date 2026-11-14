@@ -57,6 +57,7 @@ ErrorCode parse_expr(Parser *parser, AstNode **out_node, DataType *out_type);
 ErrorCode type_func(Parser *parser, DataType *out_type);
 ErrorCode type(Parser *parser, DataType *out_type);
 ErrorCode param_lists(Parser *parser, AstNode ***params, int *param_count);
+ErrorCode interp_string(Parser *parser, AstNode **out_node, DataType *out_type);
 
 /**
  * @brief Initializes the parser and prepares it for syntactic analysis.
@@ -86,6 +87,16 @@ ErrorCode prolog(Parser *parser, AstNode **out_program_node);
  * @return ErrorCode ERR_OK if the token matches, ERR_SYNTAX if a syntax error occurs.
  */
 ErrorCode compare_token(Parser *parser, TokenType expected);
+
+
+
+/**
+ * Frees the parts in istring block
+ * 
+ * @param interp_free_parts structure
+ */
+void interp_free_parts(AstNode **parts, int count);
+
 
 /**
  * Frees the parser

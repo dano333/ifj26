@@ -760,7 +760,7 @@ ErrorCode ret_val(Parser *parser, DataType expected_ret_type, AstNode **return_n
 
     if (t == TOKEN_ID_IDENT || t == TOKEN_LIT_INT || t == TOKEN_LIT_DOUBLE || t == TOKEN_LIT_STRING ||
         t == TOKEN_KW_TRUE || t == TOKEN_KW_FALSE || t == TOKEN_SE_LPAREN || t == TOKEN_OP_MINUS || t == TOKEN_OP_NOT ||
-        t == TOKEN_KW_IF) {
+        t == TOKEN_KW_IF || t == TOKEN_INTERP_START) {
         
         // Pravidlo 41: <RET_VAL> -> <VAL>
         if ((err = parse_expr(parser, &expr_node, &expr_type)) != ERR_OK) {
@@ -907,8 +907,13 @@ ErrorCode val(Parser *parser, AstNode **out_node, DataType *out_type) {
                 return err;
             }
             *out_type = ret_type;
-        }
+        }                       
         free(id_name);
+    
+    } else if (t == TOKEN_INTERP_START) {
+        if ((err = interp_string(parser, out_node, out_type)) != ERR_OK)
+            return err;
+
     } else {
         // Pravidlo 46: <VAL> -> <EXP> (resp. štandardný termín výrazu)
         PARSER_ERR("val");
@@ -1845,6 +1850,114 @@ ErrorCode exp_cont(Parser *parser, DataType left_type, DataType *out_type) {
 	return ERR_OK;
 }
 
+ErrorCode interp_string(Parser *parser, AstNode **out_node, DataType *out_type) {
+	ErrorCode err = ERR_OK;
+	AstNode **parts = NULL;
+	int count = 0;
+	int line = parser->current_token.line;
+	int col = parser->current_token.column;
+
+	if ((err = compare_token(parser, TOKEN_INTERP_START)) != ERR_OK) {
+		return err;
+	}
+
+	while (parser->current_token.type != TOKEN_INTERP_END) {
+		AstNode *part = NULL;
+		TokenType t = parser->current_token.type;
+
+		if (t == TOKEN_INTERP_TEXT) {
+			
+			char *txt = strdup(parser->current_token.value.string_value ? parser->current_token.value.string_value : "");
+			if (!txt) {
+				interp_free_parts(parts, count);
+				return ERR_NOMEM;
+			}
+			part = ast_new_literal_string(txt, parser->current_token.line, parser->current_token.column);
+			if (!part) {
+				free(txt);
+				interp_free_parts(parts, count);
+				return ERR_NOMEM;
+			}
+			part->type = TYPE_STRING;
+			if ((err = compare_token(parser, t)) != ERR_OK) {
+				ast_free(part);
+				interp_free_parts(parts, count);
+				return err;
+			}
+
+		} else if (t == TOKEN_INTERP_ID) {
+			Symbol *sym = symtable_lookup(parser->current_scope, parser->current_token.value.string_value);
+			if (sym == NULL) {
+				interp_free_parts(parts, count);
+				return ERR_SEMANTIC_UNDEFINED;
+			}
+			char *name = strdup(parser->current_token.value.string_value);
+			if (!name) {
+				interp_free_parts(parts, count);
+				return ERR_NOMEM;
+			}
+			part = ast_new_identifier(name, parser->current_token.line, parser->current_token.column);
+			if (!part) {
+				free(name);
+				interp_free_parts(parts, count);
+				return ERR_NOMEM;
+			}
+			part->type = sym->type;
+			if ((err = compare_token(parser, t)) != ERR_OK) {
+				ast_free(part);
+				interp_free_parts(parts, count);
+				return err;
+			}
+
+		} else if (t == TOKEN_INTERP_EXPR_START) {
+			DataType expr_type;
+			if ((err = compare_token(parser, t)) != ERR_OK) {
+				interp_free_parts(parts, count);
+				return err;
+			}
+			if ((err = parse_expr(parser, &part, &expr_type)) != ERR_OK) {
+				ast_free(part);
+				interp_free_parts(parts, count);
+				return err;
+			}
+			if ((err = compare_token(parser, TOKEN_INTERP_EXPR_END)) != ERR_OK) {
+				ast_free(part);
+				interp_free_parts(parts, count);
+				return err;
+			}
+
+		} else {
+			interp_free_parts(parts, count);
+			PARSER_ERR("interp_string");
+		}
+
+		AstNode **tmp = realloc(parts, (count + 1) * sizeof(AstNode *));
+		if (!tmp) {
+			ast_free(part);
+			interp_free_parts(parts, count);
+			return ERR_NOMEM;
+		}
+		parts = tmp;
+		parts[count++] = part;
+	}
+
+	if ((err = compare_token(parser, TOKEN_INTERP_END)) != ERR_OK) {
+		interp_free_parts(parts, count);
+		return err;
+	}
+
+	*out_node = ast_new_istring(parts, count, line, col);
+	if (!*out_node) {
+		interp_free_parts(parts, count);
+		return ERR_NOMEM;
+	}
+
+	(*out_node)->type = TYPE_STRING;
+	*out_type = TYPE_STRING;
+
+	return ERR_OK;
+}
+
 ErrorCode parse_expr(Parser *parser, AstNode **out_node, DataType *out_type) {
 	ErrorCode err = ERR_OK;
 	DataType left_type;
@@ -1860,6 +1973,14 @@ ErrorCode parse_expr(Parser *parser, AstNode **out_node, DataType *out_type) {
 ErrorCode type_func(Parser *parser, DataType *out_type) { 
     return type(parser, out_type); 
 }
+
+void interp_free_parts(AstNode **parts, int count) {
+	for (int i = 0; i < count; i++) {
+		ast_free(parts[i]);
+	}
+	free(parts);
+}
+
 
 void parser_free(Parser *parser) {
 	if (parser != NULL) {

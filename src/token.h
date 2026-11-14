@@ -81,6 +81,13 @@ typedef enum {
 	TOKEN_LIT_DOUBLE, // Double literal
 	TOKEN_LIT_STRING, // String literal
 
+	TOKEN_INTERP_START,
+	TOKEN_INTERP_TEXT,
+	TOKEN_INTERP_ID,
+	TOKEN_INTERP_EXPR_START,
+	TOKEN_INTERP_EXPR_END,
+	TOKEN_INTERP_END,
+
 } TokenType;
 
 typedef struct {
