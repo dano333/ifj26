@@ -1850,6 +1850,9 @@ ErrorCode exp_cont(Parser *parser, DataType left_type, DataType *out_type) {
 	return ERR_OK;
 }
 
+// =============================================================================================================================
+//                                              ISTRING
+// =============================================================================================================================
 ErrorCode interp_string(Parser *parser, AstNode **out_node, DataType *out_type) {
 	ErrorCode err = ERR_OK;
 	AstNode **parts = NULL;
