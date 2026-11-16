@@ -24,7 +24,7 @@ typedef struct {
 
 ErrorCode f_list(Parser *parser, AstNode ***functions, int *func_count, AstNode ***extensions, int *ext_count);
 ErrorCode f_def(Parser *parser, AstNode **func_node);
-ErrorCode anotacia(Parser *parser, bool *is_main);
+ErrorCode annotation(Parser *parser, bool *is_main);
 ErrorCode extension(Parser *parser, AstNode **ext_node);
 ErrorCode e_body(Parser *parser, AstNode ***methods, int *count, int *capacity);
 ErrorCode eb_next(Parser *parser, AstNode ***methods, int *count, int *capacity);

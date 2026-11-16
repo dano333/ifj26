@@ -351,7 +351,7 @@ ErrorCode f_def(Parser *parser, AstNode **func_node) {
 	int line = parser->current_token.line;
 	int col = parser->current_token.column;
 
-	if ((err = anotacia(parser, &is_main)) != ERR_OK) {
+	if ((err = annotation(parser, &is_main)) != ERR_OK) {
 		return err;
 	}
 	if ((err = compare_token(parser, TOKEN_KW_DEF)) != ERR_OK) {
@@ -382,9 +382,9 @@ ErrorCode f_def(Parser *parser, AstNode **func_node) {
 }
 
 /* =============================================================================================================== */
-/*  ANOTACIA (rules 10, 11)                                                                                        */
+/*  ANNOTATION(rules 10, 11)                                                                                     */
 /* =============================================================================================================== */
-ErrorCode anotacia(Parser *parser, bool *is_main) {
+ErrorCode annotation(Parser *parser, bool *is_main) {
 	ErrorCode err;
 	*is_main = false;
 
@@ -395,7 +395,7 @@ ErrorCode anotacia(Parser *parser, bool *is_main) {
 		return err;
 	}
 	if (parser->current_token.type != TOKEN_ID_IDENT || strcmp(parser->current_token.value.string_value, "main") != 0) {
-		PARSER_ERR("anotacia");
+		PARSER_ERR("annotation");
 	}
 	if ((err = parser_next_token(parser)) != ERR_OK) {
 		return err;

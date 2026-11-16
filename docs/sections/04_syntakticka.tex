@@ -33,13 +33,13 @@ Parser udržiava zreťazené tabuľky symbolov (\texttt{current\_scope}). Nový 
 2 & $\langle\text{F\_LIST}\rangle$ & $\rightarrow$ $\langle\text{F\_DEF}\rangle$ $\langle\text{F\_LIST}\rangle$ & Ďalšia definícia funkcie. \\
 3 & $\langle\text{F\_LIST}\rangle$ & $\rightarrow$ $\langle\text{EXTENSION}\rangle$ $\langle\text{F\_LIST}\rangle$ & Ďalšie rozšírenie typu. \\
 4 & $\langle\text{F\_LIST}\rangle$ & $\rightarrow$ $\varepsilon$ & Koniec zoznamu definícií. \\
-5 & $\langle\text{F\_DEF}\rangle$ & $\rightarrow$ $\langle\text{ANOTACIA}\rangle$ def id $\langle\text{PARAM\_LISTS}\rangle$ $\langle\text{D\_TYPE}\rangle$ = $\langle\text{F\_BODY\_END}\rangle$ & Definícia funkcie s voliteľnou anotáciou. \\
+5 & $\langle\text{F\_DEF}\rangle$ & $\rightarrow$ $\langle\text{ANNOTATION}\rangle$ def id $\langle\text{PARAM\_LISTS}\rangle$ $\langle\text{D\_TYPE}\rangle$ = $\langle\text{F\_BODY\_END}\rangle$ & Definícia funkcie s voliteľnou anotáciou. \\
 6 & $\langle\text{PARAM\_LISTS}\rangle$ & $\rightarrow$ ( $\langle\text{PARAMETER}\rangle$ ) $\langle\text{PARAM\_LISTS}\rangle$ & Zoznam parametrov; môže ich byť viac (currying). \\
 7 & $\langle\text{PARAM\_LISTS}\rangle$ & $\rightarrow$ $\varepsilon$ & Koniec zoznamov parametrov. \\
 8 & $\langle\text{F\_BODY\_END}\rangle$ & $\rightarrow$ EOL* INDENT $\langle\text{F\_BODY}\rangle$ DEDENT & Viacriadkové telo funkcie. \\
 9 & $\langle\text{F\_BODY\_END}\rangle$ & $\rightarrow$ $\langle\text{EXP}\rangle$ EOL & Telo tvorené jedným výrazom (implicitný \texttt{return}). \\
-10 & $\langle\text{ANOTACIA}\rangle$ & $\rightarrow$ @ main $\langle\text{NEW\_LINE}\rangle$ & Označenie funkcie \texttt{@main}. \\
-11 & $\langle\text{ANOTACIA}\rangle$ & $\rightarrow$ $\varepsilon$ & Funkcia bez anotácie. \\
+10 & $\langle\text{ANNOTATION}\rangle$ & $\rightarrow$ @ main $\langle\text{NEW\_LINE}\rangle$ & Označenie funkcie \texttt{@main}. \\
+11 & $\langle\text{ANNOTATION}\rangle$ & $\rightarrow$ $\varepsilon$ & Funkcia bez anotácie. \\
 12 & $\langle\text{NEW\_LINE}\rangle$ & $\rightarrow$ EOL & Nový riadok za anotáciou. \\
 13 & $\langle\text{NEW\_LINE}\rangle$ & $\rightarrow$ $\varepsilon$ & Bez nového riadku. \\
 14 & $\langle\text{EXTENSION}\rangle$ & $\rightarrow$ extension ( id : $\langle\text{TYPE}\rangle$ ) EOL INDENT $\langle\text{E\_BODY}\rangle$ DEDENT & Rozšírenie typu o metódy; \texttt{id} je prijímač. \\
