@@ -79,6 +79,7 @@ typedef enum {
 	TOKEN_LIT_DOUBLE, // Double literal
 	TOKEN_LIT_STRING, // String literal
 
+	/*interpolateds*/
 	TOKEN_INTERP_START,
 	TOKEN_INTERP_TEXT,
 	TOKEN_INTERP_ID,

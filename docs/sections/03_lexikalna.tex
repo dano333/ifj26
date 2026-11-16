@@ -13,7 +13,7 @@ Identifikátory a kľúčové slová sa najprv načítavajú do bufferu a potom 
 Automat pri číslach postupne podľa stavu a načítaného znaku rozlíši či sa jedná o celočíslo, desatinné číslo alebo číslo vo vedeckom zápise. Znaky \texttt{\_} sa na miestach kde sa môžu nachádzať ignorujú a znaky \texttt{e/E} a \texttt{d/D} sa používaju na určenie zápisu čísla.
 
 \subsection{Reťazcové literály}
-Automat v jednoriadkovom reťazci kontroluje jednotlivé znaky postupne a ak nájde v reťazci znak \texttt{\\} tak akceptuje ako ďalší znak iba jeden z piatich povolených ktoré môžu nasledovať.
+Automat v jednoriadkovom reťazci kontroluje jednotlivé znaky postupne a ak nájde v reťazci znak \texttt{\textbackslash{}} tak akceptuje ako ďalší znak iba jeden z piatich povolených ktoré môžu nasledovať.
 Ak sa v reťazci objaví \texttt{EOF} alebo \texttt{LF} alebo sa reťazec neukončí tak vyhodí chybu.
 Vo viacriadkovom reťazci kontroluje správny začiatok, koniec a či sa v ňom nenachádza \texttt{EOF}.
 
@@ -22,4 +22,4 @@ Skener kontroluje odsadenia pomocou zásobníka \texttt{indent\_stack}, skener s
 Skener počíta medzery na začiatku logického a porovnáva ich so zásobníkom vďaka čomu potom posiela tokeny \texttt{TOKEN\_INDENT} a \texttt{TOKEN\_DEDENT}.
 
 \subsection{Komentáre}
-Skener ignoruje riadky s komentármi a podporuje vnorené úrovne viacriadkových komentárov \texttt{/* ... */} pomocou sledovania hĺbky cez premennú \texttt{comment\_depth}
+Skener ignoruje riadky s komentármi a podporuje vnorené úrovne viacriadkových komentárov \texttt{/\* ... \*/} pomocou sledovania hĺbky cez premennú \texttt{comment\_depth}

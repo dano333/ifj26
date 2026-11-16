@@ -4,6 +4,7 @@
  * Description: scanner
  */
 
+#define _POSIX_C_SOURCE 200809L
 #include "scanner.h"
 #include <errno.h>
 #include <limits.h>
@@ -45,7 +46,20 @@ typedef enum {
 	STATE_STR_MULTI_START,                    // """ text
 	STATE_STR_MULTI_Q1,                       // """ text "
 	STATE_STR_MULTI_Q2,                       // """ text ""
-	STATE_STR_MULTI_END                       // """ text """
+	STATE_STR_MULTI_END,                      // """ text """
+	STATE_S,                                  // s
+	STATE_S_ONE,                              // s"
+	STATE_S_TWO,                              // s""
+	STATE_SINGLE_TEXT,                        // s" text
+	STATE_SINGLE_ESCAPE,                      // s" /* \ */
+	STATE_SINGLE_ID,                          // s" id
+	STATE_SINGLE_DOLLAR,                      // s" $
+	STATE_MULTI_TEXT,                         // s""" text
+	STATE_MULTI_ID,                           // s""" id
+	STATE_MULTI_DOLLAR,                       // s""" $
+	STATE_MULTI_ONE,                          // s""" "
+	STATE_MULTI_TWO,                          // s""" ""
+
 } ScannerState;
 
 typedef struct {
@@ -83,7 +97,8 @@ static void scanner_ungetc(int character, Scanner *scanner) {
 }
 
 void token_free(Token *token) {
-	if (token != NULL && (token->type == TOKEN_ID_IDENT || token->type == TOKEN_LIT_STRING)) {
+	if (token != NULL && (token->type == TOKEN_ID_IDENT || token->type == TOKEN_LIT_STRING ||
+	                      token->type == TOKEN_INTERP_TEXT || token->type == TOKEN_INTERP_ID)) {
 		if (token->value.string_value != NULL) {
 			free(token->value.string_value);
 			token->value.string_value = NULL;
@@ -96,6 +111,8 @@ ErrorCode scanner_init(Scanner *scanner) {
 	scanner->end_of_line = 1;
 	scanner->pending_dedents = 0;
 	scanner->paren_depth = 0;
+	scanner->interp_state = INTERP_NONE;
+	scanner->pending_interp_end = 0;
 	ErrorCode err1 = string_init(&scanner->buffer);
 	if (err1 != ERR_OK) {
 		return err1;
@@ -145,6 +162,16 @@ static ErrorCode send_double(Token *token, Scanner *scanner, int character) {
 	return ERR_OK;
 }
 
+static ErrorCode send_string(Token *token, Scanner *scanner, TokenType type) {
+	token->type = type;
+	token->value.string_value = strdup(scanner->buffer.data);
+	if (token->value.string_value == NULL) {
+		return ERR_INTERNAL_COMPILER;
+	}
+	return ERR_OK;
+}
+
+// returns 1 if \n means EOL, if not returns 0
 static int ends_logical_line(const Scanner *scanner) { return scanner->end_of_line == 0 && scanner->paren_depth == 0; }
 
 ErrorCode get_token(Token *token, Scanner *scanner) {
@@ -160,6 +187,25 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 		scanner->pending_dedents--;
 		token->type = TOKEN_DEDENT;
 		return ERR_OK;
+	}
+
+	if (scanner->pending_interp_end) {
+		token->type = TOKEN_INTERP_END;
+		scanner->pending_interp_end = 0;
+		token->line = scanner->line;
+		token->column = scanner->column;
+		return ERR_OK;
+	}
+	if (scanner->interp_state == INTERP_TEXT_SINGLE) {
+		state = STATE_SINGLE_TEXT;
+		string_clear(&scanner->buffer);
+		token->line = scanner->line;
+		token->column = scanner->column;
+	} else if (scanner->interp_state == INTERP_TEXT_MULTI) {
+		state = STATE_MULTI_TEXT;
+		string_clear(&scanner->buffer);
+		token->line = scanner->line;
+		token->column = scanner->column;
 	}
 
 	while (1) {
@@ -181,7 +227,12 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 					tab_in_indent = 1;
 				}
 				break;
-			} else if (character == EOF) {
+			}
+
+			else if (character == EOF) {
+				if (scanner->interp_state != INTERP_NONE) {
+					return ERR_LEXICAL;
+				}
 				if (scanner->end_of_line == 0) {
 					scanner->end_of_line = 1;
 					token->type = TOKEN_EOL;
@@ -194,7 +245,12 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				}
 				token->type = TOKEN_EOF;
 				return ERR_OK;
-			} else if (character == '\n') {
+			}
+
+			else if (character == '\n') {
+				if (scanner->interp_state == INTERP_EXPR_SINGLE) {
+					return ERR_LEXICAL;
+				}
 				scanner->column = 1;
 				scanner->line++;
 				if (ends_logical_line(scanner)) {
@@ -280,8 +336,15 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				string_clear(&scanner->buffer);
 				state = STATE_STR_SINGLE_START;
 				break;
-			} else if ((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
-			           character == '_') {
+			}
+
+			else if (character == 's') {
+				state = STATE_S;
+				break;
+			}
+
+			else if ((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
+			         character == '_') {
 				string_clear(&scanner->buffer);
 				ErrorCode err = string_add_char(&scanner->buffer, character);
 				if (err != ERR_OK) {
@@ -335,14 +398,27 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				}
 				state = STATE_INT_0;
 				break;
-			} else {
+			}
+
+			else if (character == '}' &&
+			         (scanner->interp_state == INTERP_EXPR_SINGLE || scanner->interp_state == INTERP_EXPR_MULTI)) {
+				if (scanner->paren_depth > 0) {
+					scanner->paren_depth--;
+				}
+				if (scanner->interp_state == INTERP_EXPR_SINGLE) {
+					scanner->interp_state = INTERP_TEXT_SINGLE;
+				} else {
+					scanner->interp_state = INTERP_TEXT_MULTI;
+				}
+				token->type = TOKEN_INTERP_EXPR_END;
+				return ERR_OK;
+			}
+
+			else { // unknown character
 				return ERR_LEXICAL;
 			}
 
 		case STATE_DIV:
-			if (new_line_in_comment == 1) {
-				return ERR_LEXICAL;
-			}
 			if (character == '/') {
 				state = STATE_COMMENT_1;
 				break;
@@ -351,6 +427,9 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				comment_depth++;
 				break;
 			} else {
+				if (new_line_in_comment == 1) { // /* */  / 5 is valid,   /* \n */  / 5 is invalid
+					return ERR_LEXICAL;
+				}
 				scanner->end_of_line = 0;
 				token->type = TOKEN_OP_DIV;
 				scanner_ungetc(character, scanner);
@@ -430,10 +509,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				token->type = check_for_token(scanner->buffer.data);
 
 				if (token->type == TOKEN_ID_IDENT) {
-					token->value.string_value = strdup(scanner->buffer.data);
-					if (token->value.string_value == NULL) {
-						return ERR_INTERNAL_COMPILER;
-					}
+					return send_string(token, scanner, TOKEN_ID_IDENT);
 				}
 				return ERR_OK;
 			}
@@ -800,12 +876,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 
 		case STATE_STR_SINGLE_END:
 			scanner_ungetc(character, scanner);
-			token->type = TOKEN_LIT_STRING;
-			token->value.string_value = strdup(scanner->buffer.data);
-			if (token->value.string_value == NULL) {
-				return ERR_INTERNAL_COMPILER;
-			}
-			return ERR_OK;
+			return send_string(token, scanner, TOKEN_LIT_STRING);
 
 		case STATE_STR_EMPTY:
 			if (character == '"') {
@@ -813,12 +884,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				break;
 			} else {
 				scanner_ungetc(character, scanner);
-				token->type = TOKEN_LIT_STRING;
-				token->value.string_value = strdup(scanner->buffer.data);
-				if (token->value.string_value == NULL) {
-					return ERR_INTERNAL_COMPILER;
-				}
-				return ERR_OK;
+				return send_string(token, scanner, TOKEN_LIT_STRING);
 			}
 
 		case STATE_STR_MULTI_START:
@@ -883,12 +949,276 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 
 		case STATE_STR_MULTI_END:
 			scanner_ungetc(character, scanner);
-			token->type = TOKEN_LIT_STRING;
-			token->value.string_value = strdup(scanner->buffer.data);
-			if (token->value.string_value == NULL) {
-				return ERR_INTERNAL_COMPILER;
+			return send_string(token, scanner, TOKEN_LIT_STRING);
+
+		case STATE_S:
+
+			if (character == '"') {
+				if (scanner->interp_state != INTERP_NONE) {
+					return ERR_LEXICAL;
+				}
+				state = STATE_S_ONE;
+				break;
+			} else {
+				string_clear(&scanner->buffer);
+				ErrorCode err1 = string_add_char(&scanner->buffer, 's');
+				if (err1 != ERR_OK) {
+					return err1;
+				}
+				scanner_ungetc(character, scanner);
+				state = STATE_IDENT;
+				break;
 			}
-			return ERR_OK;
+
+		case STATE_S_ONE:
+
+			if (character == '"') {
+				state = STATE_S_TWO;
+				break;
+			} else {
+				scanner_ungetc(character, scanner);
+				scanner->interp_state = INTERP_TEXT_SINGLE;
+				token->type = TOKEN_INTERP_START;
+				return ERR_OK;
+			}
+
+		case STATE_S_TWO:
+
+			if (character == '"') {
+				scanner->interp_state = INTERP_TEXT_MULTI;
+				token->type = TOKEN_INTERP_START;
+				return ERR_OK;
+			} else {
+				scanner_ungetc(character, scanner);
+				scanner->pending_interp_end = 1;
+				scanner->interp_state = INTERP_NONE;
+				token->type = TOKEN_INTERP_START;
+				return ERR_OK;
+			}
+
+		case STATE_SINGLE_TEXT:
+
+			if (character == '\\') {
+				state = STATE_SINGLE_ESCAPE;
+				break;
+			} else if (character == '\n' || character == EOF) {
+				return ERR_LEXICAL;
+			} else if (character == '"') {
+				if (scanner->buffer.length > 0) {
+					scanner_ungetc(character, scanner);
+					return send_string(token, scanner, TOKEN_INTERP_TEXT);
+				}
+				scanner->interp_state = INTERP_NONE;
+				token->type = TOKEN_INTERP_END;
+				return ERR_OK;
+			} else if (character == '$') {
+				if (scanner->buffer.length > 0) {
+					scanner_ungetc(character, scanner);
+					return send_string(token, scanner, TOKEN_INTERP_TEXT);
+				}
+				state = STATE_SINGLE_DOLLAR;
+				break;
+			} else {
+				ErrorCode err = string_add_char(&scanner->buffer, character);
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_SINGLE_TEXT;
+				break;
+			}
+
+		case STATE_SINGLE_ESCAPE:
+
+			if (character == '\\') {
+				ErrorCode err = string_add_char(&scanner->buffer, '\\');
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_SINGLE_TEXT;
+				break;
+			} else if (character == '"') {
+				ErrorCode err = string_add_char(&scanner->buffer, '"');
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_SINGLE_TEXT;
+				break;
+			} else if (character == 'n') {
+				ErrorCode err = string_add_char(&scanner->buffer, '\n');
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_SINGLE_TEXT;
+				break;
+			} else if (character == 'r') {
+				ErrorCode err = string_add_char(&scanner->buffer, '\r');
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_SINGLE_TEXT;
+				break;
+			} else if (character == 't') {
+				ErrorCode err = string_add_char(&scanner->buffer, '\t');
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_SINGLE_TEXT;
+				break;
+			} else {
+				return ERR_LEXICAL;
+			}
+
+		case STATE_SINGLE_ID:
+
+			if ((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
+			    (character >= '0' && character <= '9') || character == '_') {
+				ErrorCode err = string_add_char(&scanner->buffer, character);
+				if (err != ERR_OK) {
+					return err;
+				}
+				break;
+			} else {
+				scanner_ungetc(character, scanner);
+				return send_string(token, scanner, TOKEN_INTERP_ID);
+			}
+
+		case STATE_SINGLE_DOLLAR:
+
+			if (character == '$') {
+				ErrorCode err = string_add_char(&scanner->buffer, '$');
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_SINGLE_TEXT;
+				break;
+			} else if (character == '{') {
+				scanner->interp_state = INTERP_EXPR_SINGLE;
+				scanner->paren_depth++;
+				token->type = TOKEN_INTERP_EXPR_START;
+				return ERR_OK;
+			} else if ((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
+			           character == '_') {
+				ErrorCode err = string_add_char(&scanner->buffer, character);
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_SINGLE_ID;
+				break;
+			} else {
+				return ERR_LEXICAL;
+			}
+
+		case STATE_MULTI_TEXT:
+
+			if (character == '\n') {
+				scanner->column = 1;
+				scanner->line++;
+				ErrorCode err = string_add_char(&scanner->buffer, character);
+				if (err != ERR_OK) {
+					return err;
+				}
+				break;
+			} else if (character == EOF) {
+				return ERR_LEXICAL;
+			} else if (character == '"') {
+				state = STATE_MULTI_ONE;
+				break;
+			} else if (character == '$') {
+				if (scanner->buffer.length > 0) {
+					scanner_ungetc(character, scanner);
+					return send_string(token, scanner, TOKEN_INTERP_TEXT);
+				}
+				state = STATE_MULTI_DOLLAR;
+				break;
+			} else {
+				ErrorCode err = string_add_char(&scanner->buffer, character);
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_MULTI_TEXT;
+				break;
+			}
+
+		case STATE_MULTI_ID:
+
+			if ((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
+			    (character >= '0' && character <= '9') || character == '_') {
+				ErrorCode err = string_add_char(&scanner->buffer, character);
+				if (err != ERR_OK) {
+					return err;
+				}
+				break;
+			} else {
+				scanner_ungetc(character, scanner);
+				return send_string(token, scanner, TOKEN_INTERP_ID);
+			}
+
+		case STATE_MULTI_DOLLAR:
+
+			if (character == '$') {
+				ErrorCode err = string_add_char(&scanner->buffer, '$');
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_MULTI_TEXT;
+				break;
+			} else if (character == '{') {
+				scanner->interp_state = INTERP_EXPR_MULTI;
+				scanner->paren_depth++;
+				token->type = TOKEN_INTERP_EXPR_START;
+				return ERR_OK;
+			} else if ((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
+			           character == '_') {
+				ErrorCode err = string_add_char(&scanner->buffer, character);
+				if (err != ERR_OK) {
+					return err;
+				}
+				state = STATE_MULTI_ID;
+				break;
+			} else {
+				return ERR_LEXICAL;
+			}
+
+		case STATE_MULTI_ONE:
+			if (character == '"') {
+				state = STATE_MULTI_TWO;
+				break;
+			} else if (character == EOF) {
+				return ERR_LEXICAL;
+			} else {
+				ErrorCode err = string_add_char(&scanner->buffer, '"');
+				if (err != ERR_OK) {
+					return err;
+				}
+				scanner_ungetc(character, scanner);
+				state = STATE_MULTI_TEXT;
+				break;
+			}
+
+		case STATE_MULTI_TWO:
+			if (character == '"') {
+				scanner->interp_state = INTERP_NONE;
+				if (scanner->buffer.length > 0) {
+					scanner->pending_interp_end = 1;
+					return send_string(token, scanner, TOKEN_INTERP_TEXT);
+				}
+				token->type = TOKEN_INTERP_END;
+				return ERR_OK;
+			} else if (character == EOF) {
+				return ERR_LEXICAL;
+			} else {
+				ErrorCode err = string_add_char(&scanner->buffer, '"');
+				if (err != ERR_OK) {
+					return err;
+				}
+				err = string_add_char(&scanner->buffer, '"');
+				if (err != ERR_OK) {
+					return err;
+				}
+				scanner_ungetc(character, scanner);
+				state = STATE_MULTI_TEXT;
+				break;
+			}
 		}
 	}
 }
