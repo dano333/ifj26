@@ -7,8 +7,6 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
-#include "string_buffer.h"
-
 typedef enum {
 	/*keywords*/
 	TOKEN_KW_DEF,       // def
@@ -35,6 +33,9 @@ typedef enum {
 	TOKEN_KW_TYPE,      // type
 	TOKEN_KW_TRUE,      // true
 	TOKEN_KW_FALSE,     // false
+	TOKEN_KW_TO,        // to
+	TOKEN_KW_UNTIL,     // until
+	TOKEN_KW_BY,        // by
 
 	/*operators*/
 	TOKEN_OP_ASSIGN, // =
@@ -77,6 +78,13 @@ typedef enum {
 	TOKEN_LIT_INT,    // Int literal
 	TOKEN_LIT_DOUBLE, // Double literal
 	TOKEN_LIT_STRING, // String literal
+
+	TOKEN_INTERP_START,
+	TOKEN_INTERP_TEXT,
+	TOKEN_INTERP_ID,
+	TOKEN_INTERP_EXPR_START,
+	TOKEN_INTERP_EXPR_END,
+	TOKEN_INTERP_END,
 
 } TokenType;
 

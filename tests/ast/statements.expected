@@ -1,0 +1,66 @@
+def id [v:Int]: Int
+  block{
+    if (v:Int > 0):Boolean
+      block{
+        return v:Int
+      }
+    else
+      block{
+        if (v:Int < 0):Boolean
+          block{
+            return (neg v:Int):Int
+          }
+        else
+          block{
+            return 0
+          }
+      }
+  }
+def x1 []: Int
+  block{
+    return 1
+  }
+@main def main []: Unit
+  block{
+    var a:Int = 10
+    var b:Int = 3
+    val c:Int = ((a:Int - b:Int):Int - 1):Int
+    val d:Int = (a:Int - (b:Int - 1):Int):Int
+    val e:Boolean = ((1 < 2):Boolean == true):Boolean
+    val f:Int = (a:Int * (neg b:Int):Int):Int
+    val g:Boolean = ("x" == "y"):Boolean
+    val h:Int = call x1 []:Int
+    val s:String = member("hi").shout() []:String
+    val n:Int = member(member(a:Int).toStr:String).strLength:Int
+    val u:Unit = ()
+    val q:Int = if-expr((a:Int > b:Int):Boolean ? block{
+    val z:Int = a:Int
+    expr z:Int
+  } : block{
+    expr b:Int
+  }):Int
+    for i <- 1 to a:Int by 2 if (i:Int > 1):Boolean if (i:Int < 9):Boolean
+      block{
+        expr call print [i:Int]:Unit
+      }
+    while (a:Int > 0):Boolean
+      block{
+        assign a = (a:Int - 1):Int
+        if (a:Int == 5):Boolean
+          block{
+            expr call print ["five"]:Unit
+          }
+      }
+    expr call print ["
+"]:Unit
+  }
+extension(s: String)
+  def shout []: String
+    block{
+      return (s:String + "!"):String
+    }
+  def twice [n:Int]: String
+    block{
+      return (s:String + s:String):String
+    }
+

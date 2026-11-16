@@ -26,8 +26,6 @@
 
             # Compiler & LLVM tooling
             pkgs.gcc
-            llvmPkgs.clang
-            llvmPkgs.llvm
             llvmPkgs.clang-tools
 
             # Debugging
