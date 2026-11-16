@@ -97,13 +97,14 @@ static void scanner_ungetc(int character, Scanner *scanner) {
 }
 
 void token_free(Token *token) {
-	if (token->type == TOKEN_ID_IDENT || token->type == TOKEN_LIT_STRING || token->type == TOKEN_INTERP_TEXT ||
-	    token->type == TOKEN_INTERP_ID) {
-		free(token->value.string_value);
-		token->value.string_value = NULL;
+	if (token != NULL && (token->type == TOKEN_ID_IDENT || token->type == TOKEN_LIT_STRING ||
+	                      token->type == TOKEN_INTERP_TEXT || token->type == TOKEN_INTERP_ID)) {
+		if (token->value.string_value != NULL) {
+			free(token->value.string_value);
+			token->value.string_value = NULL;
+		}
 	}
 }
-
 ErrorCode scanner_init(Scanner *scanner) {
 	scanner->column = 1;
 	scanner->line = 1;
@@ -120,9 +121,8 @@ ErrorCode scanner_init(Scanner *scanner) {
 	if (err2 != ERR_OK) {
 		string_free(&scanner->buffer);
 		return err2;
-	} else {
-		return ERR_OK;
 	}
+	return ERR_OK;
 }
 
 void scanner_free(Scanner *scanner) {
@@ -176,14 +176,14 @@ static int ends_logical_line(const Scanner *scanner) { return scanner->end_of_li
 
 ErrorCode get_token(Token *token, Scanner *scanner) {
 	ScannerState state = STATE_START;
-	int comment_depth = 0; // depth of /* comment
+	int comment_depth = 0;
 	int new_line_in_comment = 0;
 
 	int indent = 0;
 	int tab_in_indent = 0;
 	int indent_done = 0;
 
-	if (scanner->pending_dedents > 0) { // if there is more than 1 dedent
+	if (scanner->pending_dedents > 0) {
 		scanner->pending_dedents--;
 		token->type = TOKEN_DEDENT;
 		return ERR_OK;
@@ -214,7 +214,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 
 		switch (state) {
 		case STATE_START:
-
 			token->line = scanner->line;
 			token->column = scanner->column - 1;
 
@@ -223,9 +222,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 					indent++;
 				}
 				break;
-			}
-
-			else if (character == '\t') {
+			} else if (character == '\t') {
 				if (scanner->end_of_line == 1) {
 					tab_in_indent = 1;
 				}
@@ -272,7 +269,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				return ERR_LEXICAL;
 			}
 
-			// indent, dedent
 			if (scanner->end_of_line == 1 && scanner->paren_depth == 0 && character != '/') {
 				if (tab_in_indent == 1) {
 					return ERR_LEXICAL;
@@ -308,55 +304,35 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			if (character == '+') {
 				token->type = TOKEN_OP_PLUS;
 				return ERR_OK;
-			}
-
-			else if (character == '-') {
+			} else if (character == '-') {
 				token->type = TOKEN_OP_MINUS;
 				return ERR_OK;
-			}
-
-			else if (character == '*') {
+			} else if (character == '*') {
 				token->type = TOKEN_OP_MUL;
 				return ERR_OK;
-			}
-
-			else if (character == '/') {
+			} else if (character == '/') {
 				indent_done = 1;
 				state = STATE_DIV;
 				break;
-			}
-
-			else if (character == '=') {
+			} else if (character == '=') {
 				state = STATE_ASSIGN;
 				break;
-			}
-
-			else if (character == '!') {
+			} else if (character == '!') {
 				state = STATE_NOT;
 				break;
-			}
-
-			else if (character == '<') {
+			} else if (character == '<') {
 				state = STATE_LT;
 				break;
-			}
-
-			else if (character == '>') {
+			} else if (character == '>') {
 				state = STATE_GT;
 				break;
-			}
-
-			else if (character == '&') {
+			} else if (character == '&') {
 				state = STATE_AND;
 				break;
-			}
-
-			else if (character == '|') {
+			} else if (character == '|') {
 				state = STATE_OR;
 				break;
-			}
-
-			else if (character == '"') {
+			} else if (character == '"') {
 				string_clear(&scanner->buffer);
 				state = STATE_STR_SINGLE_START;
 				break;
@@ -376,28 +352,20 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				}
 				state = STATE_IDENT;
 				break;
-			}
-
-			else if (character == '(') {
+			} else if (character == '(') {
 				scanner->paren_depth++;
 				token->type = TOKEN_SE_LPAREN;
 				return ERR_OK;
-			}
-
-			else if (character == ')') {
+			} else if (character == ')') {
 				if (scanner->paren_depth > 0) {
 					scanner->paren_depth--;
 				}
 				token->type = TOKEN_SE_RPAREN;
 				return ERR_OK;
-			}
-
-			else if (character == ',') {
+			} else if (character == ',') {
 				token->type = TOKEN_SE_COMMA;
 				return ERR_OK;
-			}
-
-			else if (character == '.') {
+			} else if (character == '.') {
 				string_clear(&scanner->buffer);
 				ErrorCode err = string_add_char(&scanner->buffer, character);
 				if (err != ERR_OK) {
@@ -405,24 +373,16 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				}
 				state = STATE_DOT;
 				break;
-			}
-
-			else if (character == ':') {
+			} else if (character == ':') {
 				token->type = TOKEN_SE_COLON;
 				return ERR_OK;
-			}
-
-			else if (character == ';') {
+			} else if (character == ';') {
 				token->type = TOKEN_SE_SEMICOLON;
 				return ERR_OK;
-			}
-
-			else if (character == '@') {
+			} else if (character == '@') {
 				token->type = TOKEN_SE_AT;
 				return ERR_OK;
-			}
-
-			else if (character >= '1' && character <= '9') {
+			} else if (character >= '1' && character <= '9') {
 				string_clear(&scanner->buffer);
 				ErrorCode err = string_add_char(&scanner->buffer, character);
 				if (err != ERR_OK) {
@@ -430,9 +390,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				}
 				state = STATE_INT_1_9;
 				break;
-			}
-
-			else if (character == '0') {
+			} else if (character == '0') {
 				string_clear(&scanner->buffer);
 				ErrorCode err = string_add_char(&scanner->buffer, character);
 				if (err != ERR_OK) {
@@ -461,7 +419,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_DIV:
-
 			if (character == '/') {
 				state = STATE_COMMENT_1;
 				break;
@@ -480,7 +437,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_ASSIGN:
-
 			if (character == '=') {
 				token->type = TOKEN_COM_EQ;
 				return ERR_OK;
@@ -489,8 +445,8 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				scanner_ungetc(character, scanner);
 				return ERR_OK;
 			}
-		case STATE_NOT:
 
+		case STATE_NOT:
 			if (character == '=') {
 				token->type = TOKEN_COM_NE;
 				return ERR_OK;
@@ -501,7 +457,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_LT:
-
 			if (character == '=') {
 				token->type = TOKEN_COM_LE;
 				return ERR_OK;
@@ -515,7 +470,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_GT:
-
 			if (character == '=') {
 				token->type = TOKEN_COM_GE;
 				return ERR_OK;
@@ -526,7 +480,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_AND:
-
 			if (character == '&') {
 				token->type = TOKEN_OP_AND;
 				return ERR_OK;
@@ -536,7 +489,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_OR:
-
 			if (character == '|') {
 				token->type = TOKEN_OP_OR;
 				return ERR_OK;
@@ -546,7 +498,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_IDENT:
-
 			if ((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
 			    (character >= '0' && character <= '9') || character == '_') {
 				ErrorCode err = string_add_char(&scanner->buffer, character);
@@ -565,7 +516,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			break;
 
 		case STATE_COMMENT_1:
-
 			if (character == '\n') {
 				scanner->column = 1;
 				scanner->line++;
@@ -588,7 +538,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_COMMENT_2:
-
 			if (character == '\n') {
 				scanner->column = 1;
 				scanner->line++;
@@ -609,7 +558,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_COMMENT_3:
-
 			if (character == '\n') {
 				scanner->column = 1;
 				scanner->line++;
@@ -631,9 +579,7 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_COMMENT_4:
-
 			if (character == '/' && comment_depth == 1) {
-				// end of comment
 				comment_depth--;
 				state = STATE_START;
 				break;
@@ -657,7 +603,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 				break;
 			}
 
-		// numbers
 		case STATE_DOT:
 			if (character >= '0' && character <= '9') {
 				ErrorCode err = string_add_char(&scanner->buffer, character);
@@ -673,7 +618,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_DOUBLE:
-
 			if (character >= '0' && character <= '9') {
 				ErrorCode err = string_add_char(&scanner->buffer, character);
 				if (err != ERR_OK) {
@@ -699,7 +643,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_INT_1_9:
-
 			if (character >= '0' && character <= '9') {
 				ErrorCode err = string_add_char(&scanner->buffer, character);
 				if (err != ERR_OK) {
@@ -732,7 +675,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_INT_0:
-
 			if (character == '.') {
 				ErrorCode err = string_add_char(&scanner->buffer, character);
 				if (err != ERR_OK) {
@@ -757,7 +699,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_DOUBLE_E:
-
 			if (character >= '0' && character <= '9') {
 				ErrorCode err = string_add_char(&scanner->buffer, character);
 				if (err != ERR_OK) {
@@ -777,7 +718,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_DOUBLE_E_PLUS_MINUS_0_9:
-
 			if (character >= '0' && character <= '9') {
 				ErrorCode err = string_add_char(&scanner->buffer, character);
 				if (err != ERR_OK) {
@@ -796,7 +736,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_DOUBLE_E_PLUS_MINUS:
-
 			if (character >= '0' && character <= '9') {
 				ErrorCode err = string_add_char(&scanner->buffer, character);
 				if (err != ERR_OK) {
@@ -809,7 +748,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_DOUBLE_UNDERSCORE:
-
 			if (character >= '0' && character <= '9') {
 				ErrorCode err = string_add_char(&scanner->buffer, character);
 				if (err != ERR_OK) {
@@ -822,7 +760,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_INT_1_9_UNDERSCORE:
-
 			if (character >= '0' && character <= '9') {
 				ErrorCode err = string_add_char(&scanner->buffer, character);
 				if (err != ERR_OK) {
@@ -835,7 +772,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_DOUBLE_DOT:
-
 			if (character >= '0' && character <= '9') {
 				ErrorCode err = string_add_char(&scanner->buffer, character);
 				if (err != ERR_OK) {
@@ -848,11 +784,9 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_DOUBLE_D:
-
 			return send_double(token, scanner, character);
 
 		case STATE_DOUBLE_E_PLUS_MINUS_0_9_UNDERSCORE:
-
 			if (character >= '0' && character <= '9') {
 				ErrorCode err = string_add_char(&scanner->buffer, character);
 				if (err != ERR_OK) {
@@ -865,7 +799,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_STR_SINGLE_START:
-
 			if (character == '"') {
 				state = STATE_STR_EMPTY;
 				break;
@@ -884,7 +817,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_STR_SINGLE_ESCAPE:
-
 			if (character == '\\') {
 				ErrorCode err = string_add_char(&scanner->buffer, '\\');
 				if (err != ERR_OK) {
@@ -925,7 +857,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_STR_SINGLE_CONTENT:
-
 			if (character == '"') {
 				state = STATE_STR_SINGLE_END;
 				break;
@@ -944,12 +875,10 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_STR_SINGLE_END:
-
 			scanner_ungetc(character, scanner);
 			return send_string(token, scanner, TOKEN_LIT_STRING);
 
 		case STATE_STR_EMPTY:
-
 			if (character == '"') {
 				state = STATE_STR_MULTI_START;
 				break;
@@ -959,7 +888,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_STR_MULTI_START:
-
 			if (character == '"') {
 				state = STATE_STR_MULTI_Q1;
 				break;
@@ -984,7 +912,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_STR_MULTI_Q1:
-
 			if (character == '"') {
 				state = STATE_STR_MULTI_Q2;
 				break;
@@ -1001,7 +928,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_STR_MULTI_Q2:
-
 			if (character == '"') {
 				state = STATE_STR_MULTI_END;
 				break;
@@ -1022,7 +948,6 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 			}
 
 		case STATE_STR_MULTI_END:
-
 			scanner_ungetc(character, scanner);
 			return send_string(token, scanner, TOKEN_LIT_STRING);
 

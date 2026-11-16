@@ -1,2 +1,4 @@
 \section{Architektúra prekladača}
 Prekladač je navrhnutý modulárne. Tok dát prebieha od zdrojového kódu cez \texttt{tokeny} do \texttt{AST} (abstraktného syntaktického stromu) a následne do \texttt{mezikódu}.
+
+Skener (\texttt{get\_token}) dodáva tokeny na požiadanie; parser si vždy drží jediný aktuálny token. Parser zároveň rieši syntax (rekurzívny zostup pre príkazy, precedenčná analýza pre výrazy), tvorí AST a priebežne vykonáva sémantické kontroly nad tabuľkou symbolov, takže výsledný strom je typovo anotovaný. Chyba v ktorejkoľvek fáze ukončí preklad s príslušným návratovým kódom a uvoľní všetku pamäť. Generovanie kódu bude pracovať nad hotovým AST.

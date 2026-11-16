@@ -1,0 +1,27 @@
+def sign [a:Int]: Int
+  block{
+    if (a:Int > 0):Boolean
+      block{
+        return 1
+      }
+    else
+      block{
+        if (a:Int < 0):Boolean
+          block{
+            return (neg 1):Int
+          }
+        else
+          block{
+            return 0
+          }
+      }
+  }
+def half [a:Int]: Double
+  block{
+    return a:Int
+  }
+@main def main []: Unit
+  block{
+    expr call print [call sign [5]:Int]:Unit
+    expr call print [call half [3]:Double]:Unit
+  }
