@@ -43,7 +43,7 @@ typedef enum {
 	/** internal compiler error */
 	ERR_INTERNAL_COMPILER = 99,
 
-	//alokacia chyba
+	// alokacia chyba
 	ERR_NOMEM = 11,
 
 } ErrorCode;

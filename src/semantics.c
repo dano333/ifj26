@@ -13,12 +13,13 @@
 ErrorCode check_variable_assignment(SymTable *scope, const char *name) {
 	Symbol *sym = symtable_lookup(scope, name);
 	if (sym == NULL) {
-		fprintf(stderr, "\n[SEMANTIC DEBUG] check_variable_assignment failed for: '%s'\n", name);
+		fprintf(stderr, "\n[SEMANTIC DEBUG] check_variable_assignment: undefined '%s'\n", name);
 		return ERR_SEMANTIC_UNDEFINED;
 	}
+	/* val, function parameters and functions are not writable */
 	if (sym->kind != SYMBOL_VAR || !sym->is_mutable) {
-		fprintf(stderr, "\n[SEMANTIC DEBUG] check_variable_assignment failed for: '%s'\n", name);
-		return ERR_SEMANTIC_COMPATIBILITY;
+		fprintf(stderr, "\n[SEMANTIC DEBUG] check_variable_assignment: '%s' is not modifiable\n", name);
+		return ERR_SEMANTIC_FORBIDDEN_WRITING;
 	}
 	return ERR_OK;
 }
@@ -39,44 +40,69 @@ DataType get_binary_op_type(DataType left, DataType right, TokenType op) {
 		if (left == TYPE_STRING && right == TYPE_STRING && op == TOKEN_OP_PLUS) {
 			return TYPE_STRING;
 		}
-		if (left == TYPE_DOUBLE || right == TYPE_DOUBLE) {
-			return TYPE_DOUBLE;
+		if ((left == TYPE_DOUBLE || left == TYPE_INT) && (right == TYPE_DOUBLE || right == TYPE_INT)) {
+			return (left == TYPE_DOUBLE || right == TYPE_DOUBLE) ? TYPE_DOUBLE : TYPE_INT;
 		}
-		if (left == TYPE_INT && right == TYPE_INT) {
-			return TYPE_INT;
-		}
+		return TYPE_UNKNOWN;
 	}
 
-	if (op >= TOKEN_COM_EQ && op <= TOKEN_COM_GE) {
+	/* TOKEN_COM_NE, EQ, LT, LE, GT, GE are consecutive in the enum */
+	if (op >= TOKEN_COM_NE && op <= TOKEN_COM_GE) {
+		return TYPE_BOOLEAN;
+	}
+	if (op == TOKEN_OP_AND || op == TOKEN_OP_OR) {
 		return TYPE_BOOLEAN;
 	}
 
 	return TYPE_UNKNOWN;
 }
 
-ErrorCode validate_function_call(SymTable *scope, const char *func_name, DataType *arg_types, int arg_count, DataType *out_return_type) {
+ErrorCode validate_function_call(SymTable *scope, const char *func_name, DataType *arg_types, int arg_count,
+                                 DataType *out_return_type) {
 	Symbol *sym = symtable_lookup(scope, func_name);
 	if (sym == NULL) {
 		fprintf(stderr, "\n[SEMANTIC DEBUG] validate_function_call failed for: '%s'\n", func_name);
 		return ERR_SEMANTIC_UNDEFINED;
 	}
-
-	if (sym->param_types == NULL) {
-		*out_return_type = sym->type;
-		return ERR_OK;
-	}
-
-	if (sym->param_count != arg_count) {
+	if (sym->kind != SYMBOL_FUNC) {
 		return ERR_SEMANTIC_FUNCTION_CALL;
 	}
 
-	for (int i = 0; i < arg_count; i++) {
-		// TYPE_UNKNOWN in param_types (like for print/toStr Any) accepts anything
+	if (sym->param_count != arg_count) {
+		fprintf(stderr, "\n[SEMANTIC DEBUG] '%s' expects %d arguments, got %d\n", func_name, sym->param_count,
+		        arg_count);
+		return ERR_SEMANTIC_FUNCTION_CALL;
+	}
+
+	for (int i = 0; sym->param_types != NULL && i < arg_count; i++) {
+		/* TYPE_UNKNOWN in param_types (print/toStr "Any") accepts anything */
 		if (sym->param_types[i] != TYPE_UNKNOWN && !is_type_compatible(sym->param_types[i], arg_types[i])) {
-			return ERR_SEMANTIC_COMPATIBILITY;
+			fprintf(stderr, "\n[SEMANTIC DEBUG] '%s': argument %d has wrong type\n", func_name, i + 1);
+			return ERR_SEMANTIC_FUNCTION_CALL;
 		}
 	}
 
 	*out_return_type = sym->type;
 	return ERR_OK;
+}
+
+const char *type_name(DataType t) {
+	switch (t) {
+	case TYPE_INT:
+		return "Int";
+	case TYPE_DOUBLE:
+		return "Double";
+	case TYPE_STRING:
+		return "String";
+	case TYPE_BOOLEAN:
+		return "Boolean";
+	case TYPE_UNIT:
+		return "Unit";
+	default:
+		return "?";
+	}
+}
+
+void mangle_method(char *buf, size_t size, DataType receiver, const char *method) {
+	snprintf(buf, size, "%s.%s", type_name(receiver), method);
 }

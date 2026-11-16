@@ -32,6 +32,7 @@ void symtable_free(SymTable *table) {
 		while (current != NULL) {
 			Symbol *next = current->next;
 			free(current->name);
+			free(current->param_types);
 			free(current);
 			current = next;
 		}

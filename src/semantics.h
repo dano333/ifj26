@@ -11,6 +11,7 @@
 #include "symtable.h"
 #include "token.h"
 #include <stdbool.h>
+#include <stddef.h>
 
 // Check mutability when reassigning a variable
 ErrorCode check_variable_assignment(SymTable *scope, const char *name);
@@ -22,6 +23,13 @@ DataType get_binary_op_type(DataType left, DataType right, TokenType op);
 bool is_type_compatible(DataType target_type, DataType source_type);
 
 // Validate function call arity and argument types
-ErrorCode validate_function_call(SymTable *scope, const char *func_name, DataType *arg_types, int arg_count, DataType *out_return_type);
+ErrorCode validate_function_call(SymTable *scope, const char *func_name, DataType *arg_types, int arg_count,
+                                 DataType *out_return_type);
+
+// Human readable name of a type (used e.g. to key extension methods)
+const char *type_name(DataType t);
+
+// Builds the symbol-table key of an extension method: "<ReceiverType>.<method>"
+void mangle_method(char *buf, size_t size, DataType receiver, const char *method);
 
 #endif // SEMANTICS_H

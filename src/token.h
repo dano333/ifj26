@@ -7,7 +7,6 @@
 #ifndef TOKEN_H
 #define TOKEN_H
 
-
 typedef enum {
 	/*keywords*/
 	TOKEN_KW_DEF,       // def
