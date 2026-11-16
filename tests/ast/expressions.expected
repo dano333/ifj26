@@ -1,0 +1,18 @@
+def add [a:Int] [b:Int, c:Double]: Double
+  block{
+    return (a:Int + (b:Int * c:Double):Double):Double
+  }
+@main def main []: Unit
+  block{
+    var x:Int = ((1 + (2 * 3):Int):Int - (4 / 2):Int):Int
+    val d:Double = 1
+    val m:Int = (((neg x:Int):Int * 2):Int + 1):Int
+    val b:Boolean = (((! (x:Int == 1):Boolean):Boolean && (x:Int < 5):Boolean):Boolean || false):Boolean
+    val r:Double = (call add [1] [2, 3.5]:Double + 1):Double
+    val l:Int = (call strLength ["abc"]:Int - 1):Int
+    val s:String = member(x:Int).toStr:String
+    val t:String = ("a" + "b"):String
+    val e:Double = if-expr((x:Int > 1):Boolean ? 1 : 2.5):Double
+    assign x = (x:Int + 1):Int
+    expr call print [x:Int]:Unit
+  }
