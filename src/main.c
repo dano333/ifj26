@@ -10,6 +10,7 @@
 #include "parser.h"
 #include "scanner.h"
 #include "symtable.h"
+#include "generator.h"
 #include <stdio.h>
 
 int main(void) {
@@ -45,8 +46,8 @@ int main(void) {
 	err = prolog(&parser, &program_node);
 
 	if (err == ERR_OK) {
-		printf("Jej ide to\n");
-		// Tu môžeš spustiť sémantiku / generovanie kódu nad program_node
+		generator_init(stdout);
+		generate_program(program_node);
 
 		ast_free(program_node);
 	} else {
