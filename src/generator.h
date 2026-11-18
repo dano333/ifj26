@@ -7,8 +7,8 @@
 #ifndef GENERATOR_H
 #define GENERATOR_H
 
-#include <stdio.h>
 #include "ast.h"
+#include <stdio.h>
 
 /**
  * @brief Initialization of generator.
