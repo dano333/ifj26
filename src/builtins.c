@@ -62,7 +62,10 @@ ErrorCode register_builtins(SymTable *global_table) {
 	// 9. readDouble(): Double
 	add_builtin(global_table, "readDouble", TYPE_DOUBLE, NULL, 0);
 
-	// 10. print(value: Any): Unit
+	// 10. readBoolean(): Boolean
+	add_builtin(global_table, "readBoolean", TYPE_BOOLEAN, NULL, 0);
+
+	// 11. print(value: Any): Unit
 	DataType *p_print = malloc(sizeof(DataType) * 1);
 	p_print[0] = TYPE_UNKNOWN; // Any type compatibility
 	add_builtin(global_table, "print", TYPE_UNIT, p_print, 1);

@@ -1,7 +1,7 @@
-\section{Syntaktická analýza a LL gramatika}
+\section{Syntaktická analýza a LL(1) gramatika}
 
 \subsection{Princíp}
-Syntaktická analýza je založená na rekurzívnom zostupe podľa LL gramatiky uvedenej nižšie (modul \texttt{parser.c}). Každý neterminál je implementovaný jednou funkciou, ktorá podľa aktuálneho tokenu vyberie pravidlo, a tokeny sa spotrebúvajú funkciou \texttt{compare\_token}. Výrazy sa nespracúvajú rekurzívnym zostupom, ale samostatným precedenčným analyzátorom (modul \texttt{expr.c}, podsekcia \ref{sec:expr}), ktorý parser volá všade, kde gramatika obsahuje neterminál $\langle\text{EXP}\rangle$.
+Syntaktická analýza je založená na rekurzívnom zostupe podľa LL(1) gramatiky uvedenej nižšie (modul \texttt{parser.c}). Každý neterminál je implementovaný jednou funkciou, ktorá podľa aktuálneho tokenu vyberie pravidlo, a tokeny sa spotrebúvajú funkciou \texttt{compare\_token}. Výrazy sa nespracúvajú rekurzívnym zostupom, ale samostatným precedenčným analyzátorom (modul \texttt{expr.c}, podsekcia \ref{sec:expr}), ktorý parser volá všade, kde gramatika obsahuje neterminál $\langle\text{EXP}\rangle$.
 
 Parser nielen overuje syntax, ale súčasne \textbf{buduje abstraktný syntaktický strom} (\texttt{ast.h}) a vykonáva sémantické kontroly (kapitola o sémantickej analýze). Každá funkcia neterminálu vracia ukazovateľ na vytvorený uzol cez výstupný parameter a vlastníctvo uzla prechádza na volajúceho. Pri chybe funkcia uvoľní všetko, čo si dovtedy alokovala, takže sa pri žiadnom chybovom výstupe neuniká pamäť.
 
@@ -17,7 +17,7 @@ Každý uzol nesie dátový typ (\texttt{DataType}) určený pri jeho vytvorení
 \subsection{Rozsahy platnosti}
 Parser udržiava zreťazené tabuľky symbolov (\texttt{current\_scope}). Nový rozsah vzniká pre telo funkcie (spolu s parametrami), každý odsadený blok, jednoriadkový príkaz vo vetve \texttt{if}/\texttt{else} a v tele cyklu a pre cyklus \texttt{for} (riadiaca premenná je viditeľná iba v~strážach a tele). Premenná vzniká v tabuľke až po spracovaní svojho inicializačného výrazu, takže \texttt{val x = x + 1} sa správne odmietne ako použitie nedefinovaného identifikátora.
 
-\subsection{LL gramatika}
+\subsection{LL(1) gramatika}
 \small
 \noindent
 \begin{longtable}{p{0.5cm} p{3.0cm} p{6.2cm} p{3.8cm}}
@@ -98,7 +98,7 @@ Parser udržiava zreťazené tabuľky symbolov (\texttt{current\_scope}). Nový 
 \label{sec:expr}
 Výrazy spracúva modul \texttt{expr.c} pomocou zdola nahor riadeného precedenčného analyzátora so zásobníkom a precedenčnou tabuľkou. Zásobník obsahuje terminály (operátory, zátvorky, koncová značka \$) a neterminály $E$, ku ktorým je pripojený podstrom AST a jeho typ.
 
-\begin{table}[h!]
+\begin{table}[!ht]
 \centering
 \small
 \begin{tabular}{l|ccccccccccc}

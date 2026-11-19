@@ -295,8 +295,10 @@ static ErrorCode parse_member(Parser *parser, AstNode **recv_node, DataType *rec
 		return err;
 	}
 
-	/* 1) extension method of the receiver's type, 2) a function taking the receiver as first argument */
+	/* 1) extension method of the receiver's type, 2) a function taking the receiver as first argument,
+	 * 3) VALMEM built-in member access without parentheses */
 	DataType ret = TYPE_UNKNOWN;
+	bool handled = false;
 	char key[256];
 	mangle_method(key, sizeof key, *recv_type, name);
 	Symbol *msym = symtable_lookup(parser->current_scope, key);
@@ -308,6 +310,7 @@ static ErrorCode parse_member(Parser *parser, AstNode **recv_node, DataType *rec
 			free(name);
 			return err;
 		}
+		handled = true;
 	} else if (sym != NULL && sym->kind == SYMBOL_FUNC) {
 		int n = args.count + 1;
 		DataType *types = malloc(n * sizeof(DataType));
@@ -327,8 +330,45 @@ static ErrorCode parse_member(Parser *parser, AstNode **recv_node, DataType *rec
 			free(name);
 			return err;
 		}
-	} else if (*recv_type != TYPE_UNKNOWN) {
-		fprintf(stderr, "\n[SEMANTIC DEBUG] %s has no member '%s'\n", type_name(*recv_type), name);
+		handled = true;
+	} else if (!has_parens && args.count == 0) {
+		if (strcmp(name, "toString") == 0) {
+			ret = TYPE_STRING;
+			handled = true;
+		} else if (strcmp(name, "toInt") == 0) {
+			if (*recv_type != TYPE_DOUBLE && *recv_type != TYPE_UNKNOWN) {
+				fprintf(stderr, "\n[SEMANTIC DEBUG] %s has no member 'toInt'\n", type_name(*recv_type));
+				arglist_free(&args);
+				free(name);
+				return ERR_SEMANTIC_TYPE;
+			}
+			ret = TYPE_INT;
+			handled = true;
+		} else if (strcmp(name, "floor") == 0) {
+			if (*recv_type != TYPE_DOUBLE && *recv_type != TYPE_UNKNOWN) {
+				fprintf(stderr, "\n[SEMANTIC DEBUG] %s has no member 'floor'\n", type_name(*recv_type));
+				arglist_free(&args);
+				free(name);
+				return ERR_SEMANTIC_TYPE;
+			}
+			ret = TYPE_DOUBLE;
+			handled = true;
+		} else if (strcmp(name, "length") == 0) {
+			if (*recv_type != TYPE_STRING && *recv_type != TYPE_UNKNOWN) {
+				fprintf(stderr, "\n[SEMANTIC DEBUG] %s has no member 'length'\n", type_name(*recv_type));
+				arglist_free(&args);
+				free(name);
+				return ERR_SEMANTIC_TYPE;
+			}
+			ret = TYPE_INT;
+			handled = true;
+		}
+	}
+
+	if (!handled) {
+		if (*recv_type != TYPE_UNKNOWN) {
+			fprintf(stderr, "\n[SEMANTIC DEBUG] %s has no member '%s'\n", type_name(*recv_type), name);
+		}
 		arglist_free(&args);
 		free(name);
 		return ERR_SEMANTIC_UNDEFINED;
