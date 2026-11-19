@@ -52,10 +52,6 @@ static const char PREC[PT_COUNT][PT_COUNT] = {
     /* $   */ {'<', '<', '<', '<', '<', '<', '<', '<', '<', 'x', 'a'},
 };
 
-/* ------------------------------------------------------------------------- */
-/*  Helpers                                                                  */
-/* ------------------------------------------------------------------------- */
-
 static ErrorCode syntax_error(Parser *parser, const char *where) {
 	fprintf(stderr, "\n[PARSER ERROR] %s() failed at line %d, col %d (Token Type: %d)\n", where,
 	        parser->current_token.line, parser->current_token.column, parser->current_token.type);
@@ -114,10 +110,6 @@ void interp_free_parts(AstNode **parts, int count) {
 	}
 	free(parts);
 }
-
-/* ------------------------------------------------------------------------- */
-/*  Argument lists  f(a, b)(c)                                               */
-/* ------------------------------------------------------------------------- */
 
 typedef struct {
 	AstNode **nodes;
@@ -202,10 +194,6 @@ static ErrorCode parse_arg_lists(Parser *parser, ArgList *a) {
 	}
 	return ERR_OK;
 }
-
-/* ------------------------------------------------------------------------- */
-/*  Operands                                                                 */
-/* ------------------------------------------------------------------------- */
 
 static ErrorCode parse_identifier(Parser *parser, AstNode **out, DataType *type) {
 	ErrorCode err;
@@ -468,10 +456,6 @@ static ErrorCode parse_primary(Parser *parser, AstNode **out, DataType *type) {
 	return ERR_OK;
 }
 
-/* ------------------------------------------------------------------------- */
-/*  Interpolated string                                                      */
-/* ------------------------------------------------------------------------- */
-
 ErrorCode interp_string(Parser *parser, AstNode **out_node, DataType *out_type) {
 	ErrorCode err;
 	AstNode **parts = NULL;
@@ -575,10 +559,6 @@ ErrorCode interp_string(Parser *parser, AstNode **out_node, DataType *out_type) 
 	return ERR_OK;
 }
 
-/* ------------------------------------------------------------------------- */
-/*  Operator type rules                                                      */
-/* ------------------------------------------------------------------------- */
-
 static ErrorCode check_binary(OpType op, DataType l, DataType r, DataType *out) {
 	bool unk = (l == TYPE_UNKNOWN || r == TYPE_UNKNOWN);
 
@@ -678,10 +658,6 @@ static OpType token_to_op(TokenType t) {
 		return OP_OR;
 	}
 }
-
-/* ------------------------------------------------------------------------- */
-/*  Precedence parser stack                                                  */
-/* ------------------------------------------------------------------------- */
 
 typedef struct {
 	bool is_term;  /* terminal (operator, parenthesis, $) or nonterminal E */
@@ -831,10 +807,6 @@ static bool classify(TokenType t, bool prev_operand, int depth, PTerm *out) {
 	}
 	return true;
 }
-
-/* ------------------------------------------------------------------------- */
-/*  parse_expr                                                               */
-/* ------------------------------------------------------------------------- */
 
 ErrorCode parse_expr(Parser *parser, AstNode **out_node, DataType *out_type) {
 	ErrorCode err = ERR_OK;

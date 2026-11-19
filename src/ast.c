@@ -15,10 +15,6 @@ static AstNode *ast_alloc(NodeKind kind, int line, int col) {
 	return node;
 }
 
-// ==========================================
-// SPRÁVA BLOKOV (AstBlock)
-// ==========================================
-
 void block_init(AstBlock *block) {
 	if (!block)
 		return;
@@ -46,10 +42,6 @@ bool block_append(AstBlock *block, AstNode *stmt) {
 	return true;
 }
 
-// ==========================================
-// KONŠRUKTORY: LITERÁLY A IDENTIFIKÁTORY
-// ==========================================
-
 AstNode *ast_new_literal_int(long long val, int line, int col) {
 	AstNode *node = ast_alloc(NODE_LIT_INT, line, col);
 	if (!node)
@@ -73,7 +65,7 @@ AstNode *ast_new_literal_string(char *val, int line, int col) {
 	if (!node)
 		return NULL;
 	node->type = TYPE_STRING;
-	node->ast.literal.str_val = val; // Predpokladá sa vlastníctvo reťazca (strdup z lexera)
+	node->ast.literal.str_val = val;
 	return node;
 }
 
@@ -101,10 +93,6 @@ AstNode *ast_new_identifier(char *name, int line, int col) {
 	node->ast.identifier.name = name;
 	return node;
 }
-
-// ==========================================
-// KONŠRUKTORY: VÝRAZY A PRÍKAZY
-// ==========================================
 
 AstNode *ast_new_unary(OpType op, AstNode *operand, int line, int col) {
 	AstNode *node = ast_alloc(NODE_UNARY_OP, line, col);
@@ -172,10 +160,6 @@ AstNode *ast_new_return(AstNode *expr, int line, int col) {
 	return node;
 }
 
-// ==========================================
-// KONŠRUKTORY: VETVENIA A CYKLY
-// ==========================================
-
 AstNode *ast_new_if(AstNode *cond, AstNode *then_branch, AstNode *else_branch, int line, int col) {
 	AstNode *node = ast_alloc(NODE_IF_STMT, line, col);
 	if (!node)
@@ -221,10 +205,6 @@ AstNode *ast_new_for(char *var_name, AstNode *from, AstNode *to, bool is_until, 
 	return node;
 }
 
-// ==========================================
-// KONŠRUKTORY: VOLANIA A REŤAZCE (ISTRING)
-// ==========================================
-
 AstNode *ast_new_call(char *name, AstNode **args, int arg_count, int *list_sizes, int list_count, int line, int col) {
 	AstNode *node = ast_alloc(NODE_CALL, line, col);
 	if (!node)
@@ -260,10 +240,6 @@ AstNode *ast_new_istring(AstNode **parts, int part_count, int line, int col) {
 	node->ast.istring_node.part_count = part_count;
 	return node;
 }
-
-// ==========================================
-// KONŠRUKTORY: FUNKCIE, PARAMETRE A PROGRAM
-// ==========================================
 
 AstNode *ast_new_param(char *name, DataType type, int line, int col) {
 	AstNode *node = ast_alloc(NODE_PARAM, line, col);
@@ -325,15 +301,10 @@ AstNode *ast_new_program(AstNode **functions, int function_count, AstNode **exte
 	return node;
 }
 
-// ==========================================
-// UVOLNENIE PAMÄTE (Memory Deallocation)
-// ==========================================
-
 void ast_free(AstNode *node) {
 	if (!node)
 		return;
 
-	// Podľa druhu uzla uvoľníme jeho vnútorné dynamické položky
 	switch (node->kind) {
 	case NODE_LIT_STRING:
 		free(node->ast.literal.str_val);

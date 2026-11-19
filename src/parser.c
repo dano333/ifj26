@@ -13,19 +13,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* --- DEBUG MACRO FOR PARSING ERRORS --- */
+/* Debug macro to show precise parsing failure location */
 #define PARSER_ERR(func_name)                                                                                          \
 	do {                                                                                                               \
 		fprintf(stderr, "\n[PARSER ERROR] %s() failed at line %d, col %d (Token Type: %d)\n", func_name,               \
 		        parser->current_token.line, parser->current_token.column, parser->current_token.type);                 \
 		return ERR_PARSING;                                                                                            \
 	} while (0)
-
-#define TOKEN_TYPE(p) ((p)->current_token.type)
-
-/* ------------------------------------------------------------------------- */
-/*  Helpers                                                                  */
-/* ------------------------------------------------------------------------- */
 
 static ErrorCode parser_next_token(Parser *parser) {
 	token_free(&parser->current_token);
@@ -1482,9 +1476,6 @@ ErrorCode for_body(Parser *parser, AstNode **out_node) {
 	return scoped_stmt(parser, out_node); /* rule 70 */
 }
 
-/* =============================================================================================================== */
-/*  FREE                                                                                                           */
-/* =============================================================================================================== */
 void parser_free(Parser *parser) {
 	if (parser != NULL) {
 		token_free(&parser->current_token);

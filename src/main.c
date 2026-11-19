@@ -41,7 +41,7 @@ int main(void) {
 		return err;
 	}
 
-	// Koreňový uzol pre celý AST strom programu
+	// Root node for the whole abstract syntax tree of the program
 	AstNode *program_node = NULL;
 	err = prolog(&parser, &program_node);
 

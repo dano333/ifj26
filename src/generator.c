@@ -1,6 +1,6 @@
 /*
  * Project: IFJ26
- * Authors: David Pavlištík (xpavlid00)
+ * Authors: David Pavlištík (xpavlid00), Jakub Krčmárik (xkrcmaj00)
  * Description: generator of IFJcode26 (stack based code)
  */
 
@@ -14,10 +14,6 @@
 static FILE *gen_out = NULL;
 static int label_counter = 0;
 static ErrorCode gen_err = ERR_OK;
-
-/* ------------------------------------------------------------------------------------------------------------- */
-/*  Output helpers                                                                                               */
-/* ------------------------------------------------------------------------------------------------------------- */
 
 static void emit(const char *fmt, ...) {
 	va_list ap;
@@ -40,10 +36,6 @@ static void emit_string_const(const char *s) {
 }
 
 static int new_label(void) { return label_counter++; }
-
-/* ------------------------------------------------------------------------------------------------------------- */
-/*  Tables: strings, functions, variables                                                                        */
-/* ------------------------------------------------------------------------------------------------------------- */
 
 /* owned strings (unique variable names); freed at the end of the program */
 static char **pool = NULL;
@@ -245,10 +237,6 @@ static const Var *var_find(const char *name) {
 	return NULL;
 }
 
-/* ------------------------------------------------------------------------------------------------------------- */
-/*  Collecting the variables of a function (they are all defined at the function entry)                          */
-/* ------------------------------------------------------------------------------------------------------------- */
-
 static void collect(const AstNode *n) {
 	if (n == NULL) {
 		return;
@@ -320,10 +308,6 @@ static void collect(const AstNode *n) {
 		break;
 	}
 }
-
-/* ------------------------------------------------------------------------------------------------------------- */
-/*  Expressions and statements                                                                                   */
-/* ------------------------------------------------------------------------------------------------------------- */
 
 static void gen_expr(const AstNode *n);
 static void gen_stmt(const AstNode *n);
@@ -844,10 +828,6 @@ static void gen_stmt(const AstNode *n) {
 	}
 }
 
-/* ------------------------------------------------------------------------------------------------------------- */
-/*  Functions                                                                                                    */
-/* ------------------------------------------------------------------------------------------------------------- */
-
 static void gen_function(const AstNode *fn, const char *label, const char *recv_name, DataType recv_type) {
 	const AstNode *body = fn->ast.func_node.body;
 	int off = recv_name != NULL ? 1 : 0;
@@ -885,10 +865,6 @@ static void gen_function(const AstNode *fn, const char *label, const char *recv_
 	emit("RETURN");
 	scope_pop();
 }
-
-/* ------------------------------------------------------------------------------------------------------------- */
-/*  Runtime: the built-in functions written in IFJcode26 (same calling convention as user functions)             */
-/* ------------------------------------------------------------------------------------------------------------- */
 
 static const char *RUNTIME =
     /* print(value: Any): Unit - nil (the Unit value) is written as "()" */
@@ -1068,10 +1044,6 @@ static const char *RUNTIME =
     "PUSHS LF@%r\n"
     "POPFRAME\n"
     "RETURN\n";
-
-/* ------------------------------------------------------------------------------------------------------------- */
-/*  Program                                                                                                      */
-/* ------------------------------------------------------------------------------------------------------------- */
 
 void generator_init(FILE *out) {
 	gen_out = out;
