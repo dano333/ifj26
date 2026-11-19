@@ -18,8 +18,9 @@ void generator_init(FILE *out);
 
 /**
  * @brief Passes trough AST and generates IFJcode26.
- * @param node Pointer for root node of AST.
+ * @param node Pointer for root node of AST (NODE_PROGRAM).
+ * @return ERR_OK, or ERR_INTERNAL_COMPILER when the code cannot be generated (e.g. out of memory).
  */
-void generate_program(AstNode *node);
+ErrorCode generate_program(AstNode *node);
 
 #endif

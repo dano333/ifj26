@@ -7,10 +7,10 @@
 #include "ast.h"
 #include "builtins.h"
 #include "error.h"
+#include "generator.h"
 #include "parser.h"
 #include "scanner.h"
 #include "symtable.h"
-#include "generator.h"
 #include <stdio.h>
 
 int main(void) {
@@ -47,11 +47,15 @@ int main(void) {
 
 	if (err == ERR_OK) {
 		generator_init(stdout);
-		generate_program(program_node);
-
+		ErrorCode gen_err = generate_program(program_node);
 		ast_free(program_node);
+
+		if (gen_err != ERR_OK) {
+			fprintf(stderr, "Code generation failed (generator error %d)\n", gen_err);
+			err = gen_err;
+		}
 	} else {
-		printf("Ultra mega sad\n");
+		fprintf(stderr, "Translation failed (error %d)\n", err);
 	}
 
 	// Cleanup
