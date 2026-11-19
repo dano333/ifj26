@@ -4,7 +4,6 @@
  * Description: scanner
  */
 
-#define _POSIX_C_SOURCE 200809L
 #include "scanner.h"
 #include <errno.h>
 #include <limits.h>

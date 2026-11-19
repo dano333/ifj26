@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c11 -g -MMD -MP
+CFLAGS = -Wall -Wextra -std=c11 -g -MMD -MP -D_GNU_SOURCE
 
 TARGET = ifj26
 
@@ -35,5 +35,10 @@ check:
 
 format:
 	clang-format -i $(SRCS) $(HDRS)
+
+zip:
+	cp ./docs/dokumentace.pdf ./dokumentace.pdf
+	zip -r ifj26_xrothda00.zip dokumentace.pdf rozdeleni rozsireni ./src/ Makefile
+	rm -f ./dokumentace.pdf
 
 build-check: check all

@@ -1,5 +1,6 @@
 {
     "explorer.fileNesting.patterns": {
+        "README.md": "rozdeleni,rozsireni",
         "Makefile": ".clang-format,.editorconfig",
         "flake.nix": "flake.lock"
     }
