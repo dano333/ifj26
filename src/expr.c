@@ -328,7 +328,7 @@ static ErrorCode parse_member(Parser *parser, AstNode **recv_node, DataType *rec
 				fprintf(stderr, "\n[SEMANTIC DEBUG] %s has no member 'toInt'\n", type_name(*recv_type));
 				arglist_free(&args);
 				free(name);
-				return ERR_SEMANTIC_TYPE;
+				return ERR_SEMANTIC_COMPATIBILITY;
 			}
 			ret = TYPE_INT;
 			handled = true;
@@ -337,7 +337,7 @@ static ErrorCode parse_member(Parser *parser, AstNode **recv_node, DataType *rec
 				fprintf(stderr, "\n[SEMANTIC DEBUG] %s has no member 'floor'\n", type_name(*recv_type));
 				arglist_free(&args);
 				free(name);
-				return ERR_SEMANTIC_TYPE;
+				return ERR_SEMANTIC_COMPATIBILITY;
 			}
 			ret = TYPE_DOUBLE;
 			handled = true;
@@ -346,7 +346,7 @@ static ErrorCode parse_member(Parser *parser, AstNode **recv_node, DataType *rec
 				fprintf(stderr, "\n[SEMANTIC DEBUG] %s has no member 'length'\n", type_name(*recv_type));
 				arglist_free(&args);
 				free(name);
-				return ERR_SEMANTIC_TYPE;
+				return ERR_SEMANTIC_COMPATIBILITY;
 			}
 			ret = TYPE_INT;
 			handled = true;
@@ -614,7 +614,7 @@ static ErrorCode check_binary(OpType op, DataType l, DataType r, DataType *out) 
 	}
 
 	fprintf(stderr, "\n[SEMANTIC DEBUG] invalid operand types for operator %d: %d and %d\n", op, l, r);
-	return ERR_SEMANTIC_TYPE;
+	return ERR_SEMANTIC_COMPATIBILITY;
 }
 
 static ErrorCode check_unary(OpType op, DataType t, DataType *out) {
@@ -627,7 +627,7 @@ static ErrorCode check_unary(OpType op, DataType t, DataType *out) {
 		return ERR_OK;
 	}
 	fprintf(stderr, "\n[SEMANTIC DEBUG] invalid operand type for unary operator %d: %d\n", op, t);
-	return ERR_SEMANTIC_TYPE;
+	return ERR_SEMANTIC_COMPATIBILITY;
 }
 
 static OpType token_to_op(TokenType t) {

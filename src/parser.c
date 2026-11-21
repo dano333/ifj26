@@ -953,7 +953,7 @@ static ErrorCode stmt_while(Parser *parser, AstNode **out) {
 	}
 	if (!bool_like(cond_type)) {
 		ast_free(cond);
-		return ERR_SEMANTIC_TYPE;
+		return ERR_SEMANTIC_COMPATIBILITY;
 	}
 	if ((err = compare_token(parser, TOKEN_KW_DO)) != ERR_OK || (err = compare_token(parser, TOKEN_EOL)) != ERR_OK ||
 	    (err = indented_block(parser, &body)) != ERR_OK) {
@@ -1082,7 +1082,7 @@ ErrorCode if_stmt_all(Parser *parser, AstNode **out_node) {
 	}
 	if (!bool_like(cond_type)) {
 		ast_free(cond);
-		return ERR_SEMANTIC_TYPE;
+		return ERR_SEMANTIC_COMPATIBILITY;
 	}
 
 	if (parser->current_token.type == TOKEN_KW_THEN) {
@@ -1182,7 +1182,7 @@ ErrorCode if_control(Parser *parser, AstNode **out_node) {
 	}
 	if (!bool_like(cond_type)) {
 		ast_free(cond);
-		return ERR_SEMANTIC_TYPE;
+		return ERR_SEMANTIC_COMPATIBILITY;
 	}
 	if (parser->current_token.type == TOKEN_KW_THEN) {
 		if ((err = compare_token(parser, TOKEN_KW_THEN)) != ERR_OK) {
@@ -1335,14 +1335,14 @@ ErrorCode generator(Parser *parser, char **out_var_name, AstNode **out_from, Ast
 		goto fail;
 	}
 	if (t != TYPE_INT && t != TYPE_UNKNOWN) {
-		err = ERR_SEMANTIC_TYPE;
+		err = ERR_SEMANTIC_COMPATIBILITY;
 		goto fail;
 	}
 	if ((err = range_func(parser, &is_until)) != ERR_OK || (err = parse_expr(parser, &to, &t)) != ERR_OK) {
 		goto fail;
 	}
 	if (t != TYPE_INT && t != TYPE_UNKNOWN) {
-		err = ERR_SEMANTIC_TYPE;
+		err = ERR_SEMANTIC_COMPATIBILITY;
 		goto fail;
 	}
 	if ((err = opt_step(parser, &step)) != ERR_OK) {
@@ -1395,7 +1395,7 @@ ErrorCode opt_step(Parser *parser, AstNode **out_node) {
 		if (step_type != TYPE_INT && step_type != TYPE_UNKNOWN) {
 			ast_free(*out_node);
 			*out_node = NULL;
-			return ERR_SEMANTIC_TYPE;
+			return ERR_SEMANTIC_COMPATIBILITY;
 		}
 	}
 	return ERR_OK; /* rule 65 */
@@ -1412,7 +1412,7 @@ static ErrorCode parse_guard(Parser *parser, AstNode ***guards, int *count) {
 	}
 	if (!bool_like(t)) {
 		ast_free(cond);
-		return ERR_SEMANTIC_TYPE;
+		return ERR_SEMANTIC_COMPATIBILITY;
 	}
 	return push_node(guards, count, cond);
 }
