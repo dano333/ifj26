@@ -2,11 +2,6 @@
  * Project: IFJ26
  * Authors: Jakub Krčmárik (xkrcmaj00)
  * Description: expression parser - precedence syntax analysis + AST construction
- *
- * Operands (literals, identifiers, calls, if-expressions, interpolated strings)
- * are parsed by recursive helpers and pushed on the stack as nonterminal E.
- * Operators and parentheses are driven by the precedence table below.
- * Unary minus is told apart from binary minus by looking at the previous symbol.
  */
 
 #include "expr.h"
