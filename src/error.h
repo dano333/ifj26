@@ -27,8 +27,8 @@ typedef enum {
 	@main */
 	ERR_SEMANTIC_FUNCTION_CALL = 5,
 
-	/** type compatibility or type inference error in an expression, assignment, initialization, return value, or
-	control construct */
+	/** type compatibility or type inference error in an expression (operand types of operators), assignment,
+	initialization, return value, or control construct (condition, range bounds) */
 	ERR_SEMANTIC_COMPATIBILITY = 6,
 
 	/** attempt to write to a non-modifiable variable or a formal function parameter */

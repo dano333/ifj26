@@ -10,6 +10,14 @@ static void add_builtin(SymTable *table, const char *name, DataType ret_type, Da
 		sym->type = ret_type;
 		sym->param_count = param_count;
 		sym->param_types = params;
+		// every built-in has exactly one (possibly empty) parameter list: print(x), readInt()
+		sym->list_count = 1;
+		sym->list_sizes = malloc(sizeof(int));
+		if (sym->list_sizes != NULL) {
+			sym->list_sizes[0] = param_count;
+		}
+		sym->ret_explicit = true;
+		sym->defined = true;
 	}
 }
 

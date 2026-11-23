@@ -14,13 +14,36 @@
 #include "token.h"
 #include <stdbool.h>
 
+/* One function / extension method found by the pre-pass over the token buffer. */
+typedef struct {
+	int start;       /* index of the first token (the '@' of @main or the 'def') */
+	int end;         /* index of the token following the definition, valid once `node` is set */
+	Symbol *sym;     /* symbol in the global table */
+	AstNode *node;   /* parsed definition (set when it was parsed ahead of its position), NULL otherwise */
+	bool is_method;  /* extension method */
+	char *recv_name; /* extension receiver name / type (methods only) */
+	DataType recv_type;
+} FuncDefEntry;
+
 typedef struct {
 	Scanner *scanner;
 	SymTable *current_scope;
 	Token current_token;
 	DataType current_ret_type;
 	DataType ext_recv_type; /* receiver type while parsing an extension body, TYPE_UNKNOWN otherwise */
+	bool ret_explicit;      /* current function declared its return type */
+	DataType inferred_ret;  /* return type found by f_body_end for functions without a declared one */
+	TokenType prev_type;    /* type of the token consumed just before current_token */
+	/* the whole program is tokenized up front so that calls can refer to functions defined later */
+	Token *toks;
+	int tok_count, tok_cap, tok_pos; /* tok_pos = index of the next token to be delivered */
+	ErrorCode lex_err;               /* lexical error found at index tok_count (the buffer ends there) */
+	FuncDefEntry *defs;
+	int def_count, def_cap;
 } Parser;
+
+/* makes sure a function called before its definition has a known return type (parses it ahead if needed) */
+ErrorCode resolve_function(Parser *parser, Symbol *sym);
 
 ErrorCode f_list(Parser *parser, AstNode ***functions, int *func_count, AstNode ***extensions, int *ext_count);
 ErrorCode f_def(Parser *parser, AstNode **func_node);
