@@ -256,147 +256,124 @@ static ErrorCode parse_identifier(Parser *parser, AstNode **out, DataType *type)
 	return ERR_OK;
 }
 
-/* postfix  .name  or  .name(args)  applied to the E item `recv` (modified in place) */
+typedef struct {
+	const char *name;
+	DataType receiver; /* TYPE_UNKNOWN = any value */
+	DataType result;
+} Member;
+
+static const Member MEMBERS[] = {
+    {"toString", TYPE_UNKNOWN, TYPE_STRING},
+    {"toInt", TYPE_DOUBLE, TYPE_INT},
+    {"floor", TYPE_DOUBLE, TYPE_DOUBLE},
+    {"length", TYPE_STRING, TYPE_INT},
+};
+
+static ErrorCode builtin_member(DataType recv, const char *name, DataType *ret) {
+	for (size_t i = 0; i < sizeof MEMBERS / sizeof MEMBERS[0]; i++) {
+		const Member *m = &MEMBERS[i];
+		if (strcmp(m->name, name) != 0) {
+			continue;
+		}
+		if (m->receiver != TYPE_UNKNOWN && recv != TYPE_UNKNOWN && recv != m->receiver) {
+			fprintf(stderr, "\n[SEMANTIC DEBUG] %s has no member '%s'\n", type_name(recv), name);
+			return ERR_SEMANTIC_COMPATIBILITY;
+		}
+		*ret = m->result;
+		return ERR_OK;
+	}
+	if (recv != TYPE_UNKNOWN) {
+		fprintf(stderr, "\n[SEMANTIC DEBUG] %s has no member '%s'\n", type_name(recv), name);
+	}
+	return ERR_SEMANTIC_UNDEFINED;
+}
+
+static ErrorCode call_with_receiver(Parser *parser, Symbol *sym, const char *name, DataType recv, const ArgList *args,
+                                    DataType *ret) {
+	int n = args->count + 1;
+	int nl = args->lists > 0 ? args->lists : 1;
+	DataType *types = malloc((size_t)n * sizeof(DataType));
+	int *sizes = calloc((size_t)nl, sizeof(int));
+	ErrorCode err = ERR_INTERNAL_COMPILER;
+
+	if (types != NULL && sizes != NULL) {
+		types[0] = recv;
+		memcpy(types + 1, args->types, (size_t)args->count * sizeof(DataType));
+		memcpy(sizes, args->sizes, (size_t)args->lists * sizeof(int));
+		sizes[0]++;
+		err = resolve_function(parser, sym);
+		if (err == ERR_OK) {
+			err = validate_function_call(parser->current_scope, name, types, n, sizes, nl, ret);
+		}
+	}
+	free(types);
+	free(sizes);
+	return err;
+}
+
 static ErrorCode parse_member(Parser *parser, AstNode **recv_node, DataType *recv_type) {
 	ErrorCode err;
 	int line = parser->current_token.line;
 	int col = parser->current_token.column;
+	ArgList args = {0};
+	char *name = NULL;
+	DataType ret = TYPE_UNKNOWN;
 
-	if ((err = advance(parser)) != ERR_OK) { /* '.' */
+	if ((err = advance(parser)) != ERR_OK) {
 		return err;
 	}
 	if (parser->current_token.type != TOKEN_ID_IDENT) {
 		return syntax_error(parser, "parse_member");
 	}
-	char *name = strdup(parser->current_token.value.string_value);
-	if (name == NULL) {
+	if ((name = strdup(parser->current_token.value.string_value)) == NULL) {
 		return ERR_INTERNAL_COMPILER;
 	}
 	if ((err = advance(parser)) != ERR_OK) {
-		free(name);
-		return err;
+		goto fail;
 	}
 
-	ArgList args = {0};
 	bool has_parens = (parser->current_token.type == TOKEN_SE_LPAREN);
 	if (has_parens && (err = parse_arg_lists(parser, &args)) != ERR_OK) {
-		arglist_free(&args);
-		free(name);
-		return err;
+		goto fail;
 	}
 
-	/* 1) extension method of the receiver's type, 2) a function taking the receiver as first argument,
-	 * 3) VALMEM built-in member access without parentheses */
-	DataType ret = TYPE_UNKNOWN;
-	bool handled = false;
 	char key[256];
 	mangle_method(key, sizeof key, *recv_type, name);
 	Symbol *msym = symtable_lookup(parser->current_scope, key);
 	Symbol *sym = symtable_lookup(parser->current_scope, name);
+
 	if (msym != NULL && msym->kind == SYMBOL_FUNC) {
-		err = resolve_function(parser, msym);
-		if (err == ERR_OK) {
+		if ((err = resolve_function(parser, msym)) == ERR_OK) {
 			err = validate_function_call(parser->current_scope, key, args.types, args.count, args.sizes, args.lists,
 			                             &ret);
 		}
-		if (err != ERR_OK) {
-			arglist_free(&args);
-			free(name);
-			return err;
-		}
-		handled = true;
 	} else if (sym != NULL && sym->kind == SYMBOL_FUNC) {
-		int n = args.count + 1;
-		DataType *types = malloc(n * sizeof(DataType));
-		if (types == NULL) {
-			arglist_free(&args);
-			free(name);
-			return ERR_INTERNAL_COMPILER;
-		}
-		types[0] = *recv_type;
-		for (int i = 0; i < args.count; i++) {
-			types[i + 1] = args.types[i];
-		}
-		/* the receiver is the first argument of the first list: x.f(a)(b) == f(x, a)(b), x.f == f(x) */
-		int nl = args.lists > 0 ? args.lists : 1;
-		int *sz = malloc((size_t)nl * sizeof(int));
-		if (sz == NULL) {
-			free(types);
-			arglist_free(&args);
-			free(name);
-			return ERR_INTERNAL_COMPILER;
-		}
-		for (int i = 0; i < nl; i++) {
-			sz[i] = i < args.lists ? args.sizes[i] : 0;
-		}
-		sz[0] += 1;
-		err = resolve_function(parser, sym);
-		if (err == ERR_OK) {
-			err = validate_function_call(parser->current_scope, name, types, n, sz, nl, &ret);
-		}
-		free(sz);
-		free(types);
-		if (err != ERR_OK) {
-			arglist_free(&args);
-			free(name);
-			return err;
-		}
-		handled = true;
-	} else if (!has_parens && args.count == 0) {
-		if (strcmp(name, "toString") == 0) {
-			ret = TYPE_STRING;
-			handled = true;
-		} else if (strcmp(name, "toInt") == 0) {
-			if (*recv_type != TYPE_DOUBLE && *recv_type != TYPE_UNKNOWN) {
-				fprintf(stderr, "\n[SEMANTIC DEBUG] %s has no member 'toInt'\n", type_name(*recv_type));
-				arglist_free(&args);
-				free(name);
-				return ERR_SEMANTIC_COMPATIBILITY;
-			}
-			ret = TYPE_INT;
-			handled = true;
-		} else if (strcmp(name, "floor") == 0) {
-			if (*recv_type != TYPE_DOUBLE && *recv_type != TYPE_UNKNOWN) {
-				fprintf(stderr, "\n[SEMANTIC DEBUG] %s has no member 'floor'\n", type_name(*recv_type));
-				arglist_free(&args);
-				free(name);
-				return ERR_SEMANTIC_COMPATIBILITY;
-			}
-			ret = TYPE_DOUBLE;
-			handled = true;
-		} else if (strcmp(name, "length") == 0) {
-			if (*recv_type != TYPE_STRING && *recv_type != TYPE_UNKNOWN) {
-				fprintf(stderr, "\n[SEMANTIC DEBUG] %s has no member 'length'\n", type_name(*recv_type));
-				arglist_free(&args);
-				free(name);
-				return ERR_SEMANTIC_COMPATIBILITY;
-			}
-			ret = TYPE_INT;
-			handled = true;
-		}
+		err = call_with_receiver(parser, sym, name, *recv_type, &args, &ret);
+	} else if (!has_parens) {
+		err = builtin_member(*recv_type, name, &ret);
+	} else {
+		err = ERR_SEMANTIC_UNDEFINED;
 	}
-
-	if (!handled) {
-		if (*recv_type != TYPE_UNKNOWN) {
-			fprintf(stderr, "\n[SEMANTIC DEBUG] %s has no member '%s'\n", type_name(*recv_type), name);
-		}
-		arglist_free(&args);
-		free(name);
-		return ERR_SEMANTIC_UNDEFINED;
+	if (err != ERR_OK) {
+		goto fail;
 	}
 
 	AstNode *member =
 	    ast_new_member(*recv_node, name, args.nodes, args.count, args.sizes, args.lists, has_parens, line, col);
 	if (member == NULL) {
-		arglist_free(&args);
-		free(name);
-		return ERR_INTERNAL_COMPILER;
+		err = ERR_INTERNAL_COMPILER;
+		goto fail;
 	}
 	free(args.types);
 	member->type = ret;
-	*recv_node = member; /* member now owns the receiver */
+	*recv_node = member;
 	*recv_type = ret;
 	return ERR_OK;
+
+fail:
+	arglist_free(&args);
+	free(name);
+	return err;
 }
 
 static ErrorCode parse_if_expr(Parser *parser, AstNode **out, DataType *type) {
@@ -479,6 +456,51 @@ static ErrorCode parse_primary(Parser *parser, AstNode **out, DataType *type) {
 	return ERR_OK;
 }
 
+static ErrorCode interp_part(Parser *parser, AstNode **part) {
+	ErrorCode err;
+	TokenType t = parser->current_token.type;
+	int line = parser->current_token.line;
+	int col = parser->current_token.column;
+	const char *text = parser->current_token.value.string_value;
+
+	if (t == TOKEN_INTERP_EXPR_START) {
+		DataType type;
+		if ((err = advance(parser)) != ERR_OK || (err = parse_expr(parser, part, &type)) != ERR_OK) {
+			return err;
+		}
+		if ((err = compare_token(parser, TOKEN_INTERP_EXPR_END)) != ERR_OK) {
+			ast_free(*part);
+			*part = NULL;
+		}
+		return err;
+	}
+	if (t != TOKEN_INTERP_TEXT && t != TOKEN_INTERP_ID) {
+		return syntax_error(parser, "interp_string");
+	}
+
+	Symbol *sym = NULL;
+	if (t == TOKEN_INTERP_ID && (sym = symtable_lookup(parser->current_scope, text)) == NULL) {
+		return ERR_SEMANTIC_UNDEFINED;
+	}
+	char *copy = strdup(text != NULL ? text : "");
+	if (copy == NULL) {
+		return ERR_INTERNAL_COMPILER;
+	}
+	*part = (t == TOKEN_INTERP_TEXT) ? ast_new_literal_string(copy, line, col) : ast_new_identifier(copy, line, col);
+	if (*part == NULL) {
+		free(copy);
+		return ERR_INTERNAL_COMPILER;
+	}
+	if (sym != NULL) {
+		(*part)->type = sym->type;
+	}
+	if ((err = advance(parser)) != ERR_OK) {
+		ast_free(*part);
+		*part = NULL;
+	}
+	return err;
+}
+
 ErrorCode interp_string(Parser *parser, AstNode **out_node, DataType *out_type) {
 	ErrorCode err;
 	AstNode **parts = NULL;
@@ -492,94 +514,34 @@ ErrorCode interp_string(Parser *parser, AstNode **out_node, DataType *out_type) 
 
 	while (parser->current_token.type != TOKEN_INTERP_END) {
 		AstNode *part = NULL;
-		TokenType t = parser->current_token.type;
-		int pl = parser->current_token.line;
-		int pc = parser->current_token.column;
+		AstNode **tmp = NULL;
 
-		if (t == TOKEN_INTERP_TEXT) {
-			char *txt =
-			    strdup(parser->current_token.value.string_value ? parser->current_token.value.string_value : "");
-			if (txt == NULL) {
-				interp_free_parts(parts, count);
-				return ERR_INTERNAL_COMPILER;
-			}
-			part = ast_new_literal_string(txt, pl, pc);
-			if (part == NULL) {
-				free(txt);
-				interp_free_parts(parts, count);
-				return ERR_INTERNAL_COMPILER;
-			}
-			if ((err = compare_token(parser, t)) != ERR_OK) {
-				ast_free(part);
-				interp_free_parts(parts, count);
-				return err;
-			}
-		} else if (t == TOKEN_INTERP_ID) {
-			Symbol *sym = symtable_lookup(parser->current_scope, parser->current_token.value.string_value);
-			if (sym == NULL) {
-				interp_free_parts(parts, count);
-				return ERR_SEMANTIC_UNDEFINED;
-			}
-			char *name = strdup(parser->current_token.value.string_value);
-			if (name == NULL) {
-				interp_free_parts(parts, count);
-				return ERR_INTERNAL_COMPILER;
-			}
-			part = ast_new_identifier(name, pl, pc);
-			if (part == NULL) {
-				free(name);
-				interp_free_parts(parts, count);
-				return ERR_INTERNAL_COMPILER;
-			}
-			part->type = sym->type;
-			if ((err = compare_token(parser, t)) != ERR_OK) {
-				ast_free(part);
-				interp_free_parts(parts, count);
-				return err;
-			}
-		} else if (t == TOKEN_INTERP_EXPR_START) {
-			DataType et;
-			if ((err = compare_token(parser, t)) != ERR_OK) {
-				interp_free_parts(parts, count);
-				return err;
-			}
-			if ((err = parse_expr(parser, &part, &et)) != ERR_OK) {
-				interp_free_parts(parts, count);
-				return err;
-			}
-			if ((err = compare_token(parser, TOKEN_INTERP_EXPR_END)) != ERR_OK) {
-				ast_free(part);
-				interp_free_parts(parts, count);
-				return err;
-			}
-		} else {
-			interp_free_parts(parts, count);
-			return syntax_error(parser, "interp_string");
+		if ((err = interp_part(parser, &part)) != ERR_OK) {
+			goto fail;
 		}
-
-		AstNode **tmp = realloc(parts, (count + 1) * sizeof(AstNode *));
-		if (tmp == NULL) {
+		if ((tmp = realloc(parts, (size_t)(count + 1) * sizeof(AstNode *))) == NULL) {
 			ast_free(part);
-			interp_free_parts(parts, count);
-			return ERR_INTERNAL_COMPILER;
+			err = ERR_INTERNAL_COMPILER;
+			goto fail;
 		}
 		parts = tmp;
 		parts[count++] = part;
 	}
 
 	if ((err = compare_token(parser, TOKEN_INTERP_END)) != ERR_OK) {
-		interp_free_parts(parts, count);
-		return err;
+		goto fail;
 	}
-
-	*out_node = ast_new_istring(parts, count, line, col);
-	if (*out_node == NULL) {
-		interp_free_parts(parts, count);
-		return ERR_INTERNAL_COMPILER;
+	if ((*out_node = ast_new_istring(parts, count, line, col)) == NULL) {
+		err = ERR_INTERNAL_COMPILER;
+		goto fail;
 	}
 	(*out_node)->type = TYPE_STRING;
 	*out_type = TYPE_STRING;
 	return ERR_OK;
+
+fail:
+	interp_free_parts(parts, count);
+	return err;
 }
 
 static ErrorCode check_binary(OpType op, DataType l, DataType r, DataType *out) {
