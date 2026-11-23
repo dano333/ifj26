@@ -20,6 +20,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TESTS="$ROOT/tests"
 BUILD="$TESTS/build"
 BIN="$BUILD/ifj26"
+CFLAGS="-Wall -Wextra -std=c11 -g -MMD -MP -D_GNU_SOURCE"
 
 # Source directory: $SRC if given, otherwise the folder holding main.c (project root, src/, ...)
 if [ -z "$SRC" ]; then
@@ -52,13 +53,13 @@ if [ -t 1 ]; then G=$'\e[32m'; R=$'\e[31m'; Y=$'\e[33m'; N=$'\e[0m'; else G=""; 
 rm -rf "$BUILD"; mkdir -p "$BUILD"
 echo "Building..."
 if ! (cd "$SRC" && for f in *.c; do
-	gcc -Wall -Wextra -std=c11 -g -MMD -MP -c "$f" -o "$BUILD/${f%.c}.o" || exit 1
+	gcc $CFLAGS -c "$f" -o "$BUILD/${f%.c}.o" || exit 1
 done && gcc "$BUILD"/*.o -o "$BIN"); then
 	echo "${R}BUILD FAILED${N}"
 	exit 99
 fi
 DUMP="$BUILD/ast_dump"
-if ! gcc -Wall -Wextra -std=c11 -g -MMD -MP -I"$SRC" "$TESTS/tools/ast_dump.c" $(ls "$BUILD"/*.o | grep -v '/main\.o$') -o "$DUMP"; then
+if ! gcc $CFLAGS -I"$SRC" "$TESTS/tools/ast_dump.c" $(ls "$BUILD"/*.o | grep -v '/main\.o$') -o "$DUMP"; then
 	echo "${R}BUILD OF ast_dump FAILED${N}"
 	exit 99
 fi
