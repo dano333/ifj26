@@ -33,6 +33,7 @@ void symtable_free(SymTable *table) {
 			Symbol *next = current->next;
 			free(current->name);
 			free(current->param_types);
+			free(current->list_sizes);
 			free(current);
 			current = next;
 		}
@@ -83,6 +84,7 @@ ErrorCode symtable_insert(SymTable *table, const char *name, SymbolKind kind, Da
 	new_symbol->kind = kind;
 	new_symbol->type = type;
 	new_symbol->is_mutable = is_mutable;
+	new_symbol->def_index = -1;
 
 	new_symbol->next = table->buckets[idx];
 	table->buckets[idx] = new_symbol;
