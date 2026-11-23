@@ -23,8 +23,8 @@ DataType get_binary_op_type(DataType left, DataType right, TokenType op);
 bool is_type_compatible(DataType target_type, DataType source_type);
 
 // Validate function call arity and argument types
-ErrorCode validate_function_call(SymTable *scope, const char *func_name, DataType *arg_types, int arg_count,
-                                 DataType *out_return_type);
+ErrorCode validate_function_call(SymTable *scope, const char *func_name, const DataType *arg_types, int arg_count,
+                                 const int *list_sizes, int list_count, DataType *out_return_type);
 
 // Human readable name of a type (used e.g. to key extension methods)
 const char *type_name(DataType t);

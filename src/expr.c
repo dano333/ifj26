@@ -235,7 +235,9 @@ static ErrorCode parse_identifier(Parser *parser, AstNode **out, DataType *type)
 	ArgList args = {0};
 	DataType ret = TYPE_UNKNOWN;
 	if ((err = parse_arg_lists(parser, &args)) != ERR_OK ||
-	    (err = validate_function_call(parser->current_scope, name, args.types, args.count, &ret)) != ERR_OK) {
+	    (err = resolve_function(parser, symtable_lookup(parser->current_scope, name))) != ERR_OK ||
+	    (err = validate_function_call(parser->current_scope, name, args.types, args.count, args.sizes, args.lists,
+	                                  &ret)) != ERR_OK) {
 		arglist_free(&args);
 		free(name);
 		return err;
@@ -292,7 +294,11 @@ static ErrorCode parse_member(Parser *parser, AstNode **recv_node, DataType *rec
 	Symbol *msym = symtable_lookup(parser->current_scope, key);
 	Symbol *sym = symtable_lookup(parser->current_scope, name);
 	if (msym != NULL && msym->kind == SYMBOL_FUNC) {
-		err = validate_function_call(parser->current_scope, key, args.types, args.count, &ret);
+		err = resolve_function(parser, msym);
+		if (err == ERR_OK) {
+			err = validate_function_call(parser->current_scope, key, args.types, args.count, args.sizes, args.lists,
+			                             &ret);
+		}
 		if (err != ERR_OK) {
 			arglist_free(&args);
 			free(name);
@@ -311,7 +317,24 @@ static ErrorCode parse_member(Parser *parser, AstNode **recv_node, DataType *rec
 		for (int i = 0; i < args.count; i++) {
 			types[i + 1] = args.types[i];
 		}
-		err = validate_function_call(parser->current_scope, name, types, n, &ret);
+		/* the receiver is the first argument of the first list: x.f(a)(b) == f(x, a)(b), x.f == f(x) */
+		int nl = args.lists > 0 ? args.lists : 1;
+		int *sz = malloc((size_t)nl * sizeof(int));
+		if (sz == NULL) {
+			free(types);
+			arglist_free(&args);
+			free(name);
+			return ERR_INTERNAL_COMPILER;
+		}
+		for (int i = 0; i < nl; i++) {
+			sz[i] = i < args.lists ? args.sizes[i] : 0;
+		}
+		sz[0] += 1;
+		err = resolve_function(parser, sym);
+		if (err == ERR_OK) {
+			err = validate_function_call(parser->current_scope, name, types, n, sz, nl, &ret);
+		}
+		free(sz);
 		free(types);
 		if (err != ERR_OK) {
 			arglist_free(&args);

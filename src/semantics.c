@@ -57,8 +57,8 @@ DataType get_binary_op_type(DataType left, DataType right, TokenType op) {
 	return TYPE_UNKNOWN;
 }
 
-ErrorCode validate_function_call(SymTable *scope, const char *func_name, DataType *arg_types, int arg_count,
-                                 DataType *out_return_type) {
+ErrorCode validate_function_call(SymTable *scope, const char *func_name, const DataType *arg_types, int arg_count,
+                                 const int *list_sizes, int list_count, DataType *out_return_type) {
 	Symbol *sym = symtable_lookup(scope, func_name);
 	if (sym == NULL) {
 		fprintf(stderr, "\n[SEMANTIC DEBUG] validate_function_call failed for: '%s'\n", func_name);
@@ -68,6 +68,18 @@ ErrorCode validate_function_call(SymTable *scope, const char *func_name, DataTyp
 		return ERR_SEMANTIC_FUNCTION_CALL;
 	}
 
+	if (sym->list_count != list_count) {
+		fprintf(stderr, "\n[SEMANTIC DEBUG] '%s' expects %d argument lists, got %d\n", func_name, sym->list_count,
+		        list_count);
+		return ERR_SEMANTIC_FUNCTION_CALL;
+	}
+	for (int i = 0; i < list_count; i++) {
+		if (sym->list_sizes != NULL && list_sizes != NULL && sym->list_sizes[i] != list_sizes[i]) {
+			fprintf(stderr, "\n[SEMANTIC DEBUG] '%s': argument list %d expects %d arguments, got %d\n", func_name,
+			        i + 1, sym->list_sizes[i], list_sizes[i]);
+			return ERR_SEMANTIC_FUNCTION_CALL;
+		}
+	}
 	if (sym->param_count != arg_count) {
 		fprintf(stderr, "\n[SEMANTIC DEBUG] '%s' expects %d arguments, got %d\n", func_name, sym->param_count,
 		        arg_count);

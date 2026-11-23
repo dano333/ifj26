@@ -21,18 +21,18 @@
 		return ERR_PARSING;                                                                                            \
 	} while (0)
 
+/* tokens come from the pre-read buffer (it owns the strings), a lexical error is reported where it occurs */
 static ErrorCode parser_next_token(Parser *parser) {
-	token_free(&parser->current_token);
-	return get_token(&parser->current_token, parser->scanner);
-}
-
-ErrorCode parser_init(Parser *parser, Scanner *scanner, SymTable *global_table) {
-	parser->scanner = scanner;
-	parser->current_scope = global_table;
-	parser->current_ret_type = TYPE_UNKNOWN;
-	parser->ext_recv_type = TYPE_UNKNOWN;
-	memset(&parser->current_token, 0, sizeof(Token));
-	return parser_next_token(parser);
+	parser->prev_type = parser->current_token.type;
+	if (parser->tok_pos >= parser->tok_count) {
+		if (parser->lex_err != ERR_OK) {
+			return parser->lex_err;
+		}
+		parser->current_token = parser->toks[parser->tok_count - 1]; /* stay on EOF */
+		return ERR_OK;
+	}
+	parser->current_token = parser->toks[parser->tok_pos++];
+	return ERR_OK;
 }
 
 ErrorCode compare_token(Parser *parser, TokenType expected) {
@@ -73,6 +73,365 @@ static void scope_enter(Parser *parser, SymTable *scope) {
 static void scope_leave(Parser *parser, SymTable *scope) {
 	parser->current_scope = scope->parent;
 	symtable_free(scope);
+}
+
+static SymTable *global_scope(Parser *parser) {
+	SymTable *g = parser->current_scope;
+	while (g->parent != NULL) {
+		g = g->parent;
+	}
+	return g;
+}
+
+static ErrorCode tokens_read_all(Parser *parser) {
+	for (;;) {
+		Token t;
+		memset(&t, 0, sizeof t);
+		ErrorCode err = get_token(&t, parser->scanner);
+		if (err != ERR_OK) {
+			parser->lex_err = err;
+			return ERR_OK;
+		}
+		if (parser->tok_count == parser->tok_cap) {
+			int cap = parser->tok_cap == 0 ? 256 : parser->tok_cap * 2;
+			Token *tmp = realloc(parser->toks, (size_t)cap * sizeof(Token));
+			if (tmp == NULL) {
+				token_free(&t);
+				return ERR_INTERNAL_COMPILER;
+			}
+			parser->toks = tmp;
+			parser->tok_cap = cap;
+		}
+		parser->toks[parser->tok_count++] = t;
+		if (t.type == TOKEN_EOF) {
+			return ERR_OK;
+		}
+	}
+}
+
+static bool token_to_type(TokenType t, DataType *out) {
+	switch (t) {
+	case TOKEN_KW_INT:
+		*out = TYPE_INT;
+		return true;
+	case TOKEN_KW_DOUBLE:
+		*out = TYPE_DOUBLE;
+		return true;
+	case TOKEN_KW_STRING:
+		*out = TYPE_STRING;
+		return true;
+	case TOKEN_KW_BOOLEAN:
+		*out = TYPE_BOOLEAN;
+		return true;
+	case TOKEN_KW_UNIT:
+		*out = TYPE_UNIT;
+		return true;
+	default:
+		return false;
+	}
+}
+
+/* Registers the header of the function / method whose `def` is at token index i (silently ignores bad headers,
+ * the real parse reports them). */
+static ErrorCode prepass_header(Parser *parser, int i, bool is_method, const char *recv_name, DataType recv_type) {
+	Token *t = parser->toks;
+	int n = parser->tok_count;
+	int k = i + 1;
+	int start = i;
+	for (int j = i - 1; j >= 0 && t[j].type == TOKEN_EOL; j--) {
+		start = i; /* EOLs between annotation and def */
+		if (j - 1 >= 0 && t[j - 1].type == TOKEN_ID_IDENT && j - 2 >= 0 && t[j - 2].type == TOKEN_SE_AT) {
+			start = j - 2;
+		}
+	}
+	if (i - 2 >= 0 && t[i - 1].type == TOKEN_ID_IDENT && t[i - 2].type == TOKEN_SE_AT) {
+		start = i - 2;
+	}
+	if (k >= n || t[k].type != TOKEN_ID_IDENT) {
+		return ERR_OK;
+	}
+	const char *name = t[k].value.string_value;
+	k++;
+
+	DataType *types = NULL;
+	int ptotal = 0;
+	int *sizes = NULL;
+	int lists = 0;
+	ErrorCode err = ERR_OK;
+	bool ok = true;
+	while (ok && k < n && t[k].type == TOKEN_SE_LPAREN) {
+		k++;
+		int before = ptotal;
+		while (k < n && t[k].type == TOKEN_EOL) {
+			k++;
+		}
+		while (ok && k < n && t[k].type == TOKEN_ID_IDENT) {
+			DataType pt;
+			if (k + 2 < n && t[k + 1].type == TOKEN_SE_COLON && token_to_type(t[k + 2].type, &pt)) {
+				DataType *tmp = realloc(types, (size_t)(ptotal + 1) * sizeof(DataType));
+				if (tmp == NULL) {
+					err = ERR_INTERNAL_COMPILER;
+					ok = false;
+					break;
+				}
+				types = tmp;
+				types[ptotal++] = pt;
+				k += 3;
+				if (k < n && t[k].type == TOKEN_SE_COMMA) {
+					k++;
+				}
+				while (k < n && t[k].type == TOKEN_EOL) {
+					k++;
+				}
+			} else {
+				ok = false;
+			}
+		}
+		if (!ok || k >= n || t[k].type != TOKEN_SE_RPAREN) {
+			ok = false;
+			break;
+		}
+		k++;
+		int *tmp = realloc(sizes, (size_t)(lists + 1) * sizeof(int));
+		if (tmp == NULL) {
+			err = ERR_INTERNAL_COMPILER;
+			ok = false;
+			break;
+		}
+		sizes = tmp;
+		sizes[lists++] = ptotal - before;
+	}
+
+	DataType ret = TYPE_UNKNOWN;
+	bool explicit_ret = false;
+	if (ok && k < n && t[k].type == TOKEN_SE_COLON) {
+		if (k + 1 < n && token_to_type(t[k + 1].type, &ret)) {
+			explicit_ret = true;
+			k += 2;
+		} else {
+			ok = false;
+		}
+	}
+	if (ok && (k >= n || t[k].type != TOKEN_OP_ASSIGN)) {
+		ok = false;
+	}
+
+	if (ok && err == ERR_OK) {
+		char key[256];
+		const char *use = name;
+		if (is_method) {
+			mangle_method(key, sizeof key, recv_type, name);
+			use = key;
+		}
+		SymTable *g = global_scope(parser);
+		if (symtable_lookup_local(g, use) == NULL) {
+			if ((err = symtable_insert(g, use, SYMBOL_FUNC, ret, 0)) == ERR_OK) {
+				Symbol *s = symtable_lookup_local(g, use);
+				s->param_count = ptotal;
+				s->param_types = types;
+				s->list_count = lists;
+				s->list_sizes = sizes;
+				types = NULL;
+				sizes = NULL;
+				s->ret_explicit = explicit_ret;
+				s->defined = false;
+				s->def_index = parser->def_count;
+				if (parser->def_count == parser->def_cap) {
+					int cap = parser->def_cap == 0 ? 16 : parser->def_cap * 2;
+					FuncDefEntry *tmp = realloc(parser->defs, (size_t)cap * sizeof(FuncDefEntry));
+					if (tmp == NULL) {
+						err = ERR_INTERNAL_COMPILER;
+					} else {
+						parser->defs = tmp;
+						parser->def_cap = cap;
+					}
+				}
+				if (err == ERR_OK) {
+					FuncDefEntry *e = &parser->defs[parser->def_count++];
+					memset(e, 0, sizeof *e);
+					e->start = start;
+					e->sym = s;
+					e->is_method = is_method;
+					e->recv_type = recv_type;
+					e->recv_name = recv_name != NULL ? strdup(recv_name) : NULL;
+					if (is_method && e->recv_name == NULL) {
+						err = ERR_INTERNAL_COMPILER;
+					}
+				}
+			}
+		}
+	}
+	free(types);
+	free(sizes);
+	return err;
+}
+
+/* walks the token buffer once and registers all top-level functions and extension methods */
+static ErrorCode prepass(Parser *parser) {
+	Token *t = parser->toks;
+	int depth = 0;
+	bool in_ext = false;
+	const char *recv_name = NULL;
+	DataType recv_type = TYPE_UNKNOWN;
+	ErrorCode err;
+
+	for (int i = 0; i < parser->tok_count; i++) {
+		switch (t[i].type) {
+		case TOKEN_INDENT:
+			depth++;
+			break;
+		case TOKEN_DEDENT:
+			if (depth > 0) {
+				depth--;
+			}
+			if (depth == 0) {
+				in_ext = false;
+			}
+			break;
+		case TOKEN_KW_EXTENSION:
+			if (depth == 0 && i + 5 < parser->tok_count && t[i + 1].type == TOKEN_SE_LPAREN &&
+			    t[i + 2].type == TOKEN_ID_IDENT && t[i + 3].type == TOKEN_SE_COLON &&
+			    token_to_type(t[i + 4].type, &recv_type)) {
+				in_ext = true;
+				recv_name = t[i + 2].value.string_value;
+			}
+			break;
+		case TOKEN_KW_DEF:
+			if (in_ext && depth == 1) {
+				if ((err = prepass_header(parser, i, true, recv_name, recv_type)) != ERR_OK) {
+					return err;
+				}
+			} else if (!in_ext && depth == 0) {
+				if ((err = prepass_header(parser, i, false, NULL, TYPE_UNKNOWN)) != ERR_OK) {
+					return err;
+				}
+			}
+			break;
+		default:
+			break;
+		}
+	}
+	return ERR_OK;
+}
+
+ErrorCode parser_init(Parser *parser, Scanner *scanner, SymTable *global_table) {
+	memset(parser, 0, sizeof *parser);
+	parser->scanner = scanner;
+	parser->current_scope = global_table;
+	parser->current_ret_type = TYPE_UNKNOWN;
+	parser->ext_recv_type = TYPE_UNKNOWN;
+	parser->inferred_ret = TYPE_UNIT;
+	parser->prev_type = TOKEN_EOL;
+	parser->current_token.type = TOKEN_EOL;
+	ErrorCode err = tokens_read_all(parser);
+	if (err != ERR_OK) {
+		return err;
+	}
+	if ((err = prepass(parser)) != ERR_OK) {
+		return err;
+	}
+	return parser_next_token(parser);
+}
+
+static bool single_method = false; /* parse-ahead of one extension method: do not continue with its siblings */
+
+static FuncDefEntry *find_def(Parser *parser, int start) {
+	for (int i = 0; i < parser->def_count; i++) {
+		if (parser->defs[i].start == start) {
+			return &parser->defs[i];
+		}
+	}
+	return NULL;
+}
+
+/* index of the current token in the buffer */
+static int cur_index(Parser *parser) { return parser->tok_pos - 1; }
+
+/* Parses the definition number idx out of order (for a call that needs its inferred return type). */
+static ErrorCode parse_ahead(Parser *parser, int idx) {
+	ErrorCode err;
+	Token saved_tok = parser->current_token;
+	int saved_pos = parser->tok_pos;
+	SymTable *saved_scope = parser->current_scope;
+	DataType saved_ret = parser->current_ret_type, saved_recv = parser->ext_recv_type, saved_inf = parser->inferred_ret;
+	bool saved_expl = parser->ret_explicit;
+	TokenType saved_prev = parser->prev_type;
+	AstNode *node = NULL;
+	SymTable ext_scope;
+
+	parser->current_scope = global_scope(parser);
+	parser->tok_pos = parser->defs[idx].start;
+	if ((err = parser_next_token(parser)) != ERR_OK) {
+		return err;
+	}
+	if (parser->defs[idx].is_method) {
+		AstNode **ms = NULL;
+		int mc = 0, mcap = 0;
+		scope_enter(parser, &ext_scope);
+		err = symtable_insert(parser->current_scope, parser->defs[idx].recv_name, SYMBOL_VAR,
+		                      parser->defs[idx].recv_type, 0);
+		if (err == ERR_OK) {
+			parser->ext_recv_type = parser->defs[idx].recv_type;
+			single_method = true;
+			err = e_body(parser, &ms, &mc, &mcap);
+			single_method = false;
+		}
+		scope_leave(parser, &ext_scope);
+		if (err == ERR_OK && mc == 1) {
+			node = ms[0];
+			free(ms);
+		} else {
+			free_nodes(ms, mc);
+			if (err == ERR_OK) {
+				err = ERR_INTERNAL_COMPILER;
+			}
+		}
+	} else {
+		err = f_def(parser, &node);
+	}
+	if (err != ERR_OK) {
+		return err;
+	}
+	parser->defs[idx].node = node;
+	parser->defs[idx].end = cur_index(parser);
+
+	parser->current_token = saved_tok;
+	parser->tok_pos = saved_pos;
+	parser->current_scope = saved_scope;
+	parser->current_ret_type = saved_ret;
+	parser->ext_recv_type = saved_recv;
+	parser->inferred_ret = saved_inf;
+	parser->ret_explicit = saved_expl;
+	parser->prev_type = saved_prev;
+	return ERR_OK;
+}
+
+ErrorCode resolve_function(Parser *parser, Symbol *sym) {
+	if (sym == NULL || sym->kind != SYMBOL_FUNC || sym->type != TYPE_UNKNOWN || sym->ret_explicit) {
+		return ERR_OK;
+	}
+	if (sym->in_progress) {
+		fprintf(stderr, "\n[SEMANTIC DEBUG] recursive function '%s' needs an explicit return type\n", sym->name);
+		return ERR_SEMANTIC_COMPATIBILITY;
+	}
+	if (sym->defined || sym->def_index < 0 || sym->def_index >= parser->def_count) {
+		return ERR_OK;
+	}
+	return parse_ahead(parser, sym->def_index);
+}
+
+/* if the definition at the current token was already parsed ahead, takes it and skips its tokens */
+static ErrorCode take_parsed_def(Parser *parser, AstNode **out, bool *taken) {
+	*taken = false;
+	FuncDefEntry *e = find_def(parser, cur_index(parser));
+	if (e == NULL || e->node == NULL) {
+		return ERR_OK;
+	}
+	*out = e->node;
+	e->node = NULL;
+	parser->tok_pos = e->end;
+	*taken = true;
+	return parser_next_token(parser);
 }
 
 static bool is_f_def(TokenType type) { return (type == TOKEN_KW_DEF || type == TOKEN_SE_AT); }
@@ -271,6 +630,9 @@ static ErrorCode func_rest(Parser *parser, char *name, bool is_main, SymTable *r
 	AstNode *fn = NULL;
 	DataType ret_type = TYPE_UNKNOWN;
 	DataType saved_ret = parser->current_ret_type;
+	bool saved_explicit = parser->ret_explicit;
+	bool explicit_ret = false;
+	Symbol *fs = NULL;
 
 	scope_enter(parser, &scope);
 
@@ -286,26 +648,58 @@ static ErrorCode func_rest(Parser *parser, char *name, bool is_main, SymTable *r
 		goto fail;
 	}
 
+	explicit_ret = (ret_type != TYPE_UNKNOWN);
+	if (is_main && explicit_ret && ret_type != TYPE_UNIT) {
+		fprintf(stderr, "\n[SEMANTIC DEBUG] @main function must return Unit\n");
+		err = ERR_SEMANTIC_COMPATIBILITY;
+		goto fail;
+	}
+
 	if (reg_scope != NULL) {
 		const char *key = sym_name != NULL ? sym_name : name;
-		if (insert_sym && (err = symtable_insert(reg_scope, key, SYMBOL_FUNC, ret_type, 0)) != ERR_OK) {
+		fs = symtable_lookup_local(reg_scope, key);
+		if (fs != NULL && fs->defined) {
+			fs = NULL;
+			err = ERR_SEMANTIC_REDEFINITION;
 			goto fail;
 		}
-		Symbol *fs = symtable_lookup_local(reg_scope, key);
-		if (fs != NULL) {
-			fs->type = ret_type;
-			fs->param_count = param_count;
-			if (param_count > 0) {
-				fs->param_types = malloc((size_t)param_count * sizeof(DataType));
-				if (fs->param_types == NULL) {
-					err = ERR_INTERNAL_COMPILER;
-					goto fail;
-				}
-				for (int i = 0; i < param_count; i++) {
-					fs->param_types[i] = params[i]->ast.param_node.type;
-				}
+		if (fs == NULL) { /* the pre-pass could not register the header */
+			if (!insert_sym || (err = symtable_insert(reg_scope, key, SYMBOL_FUNC, ret_type, 0)) != ERR_OK) {
+				err = insert_sym ? err : ERR_INTERNAL_COMPILER;
+				goto fail;
+			}
+			fs = symtable_lookup_local(reg_scope, key);
+		}
+		free(fs->param_types);
+		free(fs->list_sizes);
+		fs->param_types = NULL;
+		fs->list_sizes = NULL;
+		fs->param_count = param_count;
+		fs->list_count = list_count;
+		if (param_count > 0) {
+			fs->param_types = malloc((size_t)param_count * sizeof(DataType));
+			if (fs->param_types == NULL) {
+				err = ERR_INTERNAL_COMPILER;
+				goto fail;
+			}
+			for (int k = 0; k < param_count; k++) {
+				fs->param_types[k] = params[k]->ast.param_node.type;
 			}
 		}
+		if (list_count > 0) {
+			fs->list_sizes = malloc((size_t)list_count * sizeof(int));
+			if (fs->list_sizes == NULL) {
+				err = ERR_INTERNAL_COMPILER;
+				goto fail;
+			}
+			for (int k = 0; k < list_count; k++) {
+				fs->list_sizes[k] = list_sizes[k];
+			}
+		}
+		fs->type = ret_type;
+		fs->ret_explicit = explicit_ret;
+		fs->defined = true;
+		fs->in_progress = true;
 	}
 
 	if ((err = compare_token(parser, TOKEN_OP_ASSIGN)) != ERR_OK) {
@@ -313,7 +707,20 @@ static ErrorCode func_rest(Parser *parser, char *name, bool is_main, SymTable *r
 	}
 
 	parser->current_ret_type = ret_type;
+	parser->ret_explicit = explicit_ret;
+	parser->inferred_ret = TYPE_UNIT;
 	if ((err = f_body_end(parser, &body)) != ERR_OK) {
+		goto fail;
+	}
+	if (!explicit_ret) { /* the type comes from the body */
+		ret_type = parser->inferred_ret;
+		if (fs != NULL) {
+			fs->type = ret_type;
+		}
+	}
+	if (is_main && ret_type != TYPE_UNIT) {
+		fprintf(stderr, "\n[SEMANTIC DEBUG] @main function must return Unit\n");
+		err = ERR_SEMANTIC_COMPATIBILITY;
 		goto fail;
 	}
 
@@ -325,12 +732,20 @@ static ErrorCode func_rest(Parser *parser, char *name, bool is_main, SymTable *r
 	}
 
 	parser->current_ret_type = saved_ret;
+	parser->ret_explicit = saved_explicit;
+	if (fs != NULL) {
+		fs->in_progress = false;
+	}
 	scope_leave(parser, &scope);
 	*out = fn;
 	return ERR_OK;
 
 fail:
 	parser->current_ret_type = saved_ret;
+	parser->ret_explicit = saved_explicit;
+	if (fs != NULL) {
+		fs->in_progress = false;
+	}
 	scope_leave(parser, &scope);
 	free_nodes(params, param_count);
 	free(list_sizes);
@@ -342,9 +757,13 @@ fail:
 ErrorCode f_def(Parser *parser, AstNode **func_node) {
 	ErrorCode err;
 	bool is_main = false;
+	bool taken = false;
 	int line = parser->current_token.line;
 	int col = parser->current_token.column;
 
+	if ((err = take_parsed_def(parser, func_node, &taken)) != ERR_OK || taken) {
+		return err;
+	}
 	if ((err = annotation(parser, &is_main)) != ERR_OK) {
 		return err;
 	}
@@ -359,20 +778,12 @@ ErrorCode f_def(Parser *parser, AstNode **func_node) {
 	if (func_name == NULL) {
 		return ERR_INTERNAL_COMPILER;
 	}
-	if (symtable_lookup_local(parser->current_scope, func_name) != NULL) {
-		free(func_name);
-		return ERR_SEMANTIC_REDEFINITION;
-	}
-	if ((err = symtable_insert(parser->current_scope, func_name, SYMBOL_FUNC, TYPE_UNKNOWN, 0)) != ERR_OK) {
-		free(func_name);
-		return err;
-	}
 	if ((err = compare_token(parser, TOKEN_ID_IDENT)) != ERR_OK) {
 		free(func_name);
 		return err;
 	}
 
-	return func_rest(parser, func_name, is_main, parser->current_scope, NULL, false, line, col, func_node);
+	return func_rest(parser, func_name, is_main, global_scope(parser), NULL, true, line, col, func_node);
 }
 
 /* =============================================================================================================== */
@@ -478,7 +889,19 @@ ErrorCode e_body(Parser *parser, AstNode ***methods, int *count, int *capacity) 
 	ErrorCode err;
 	int line = parser->current_token.line;
 	int col = parser->current_token.column;
+	AstNode *fn = NULL;
+	bool taken = false;
 
+	if ((err = take_parsed_def(parser, &fn, &taken)) != ERR_OK) {
+		return err;
+	}
+	if (taken) {
+		if ((err = push_node(methods, count, fn)) != ERR_OK) {
+			return err;
+		}
+		*capacity = *count;
+		return eb_next(parser, methods, count, capacity);
+	}
 	if ((err = compare_token(parser, TOKEN_KW_DEF)) != ERR_OK) {
 		return err;
 	}
@@ -502,7 +925,6 @@ ErrorCode e_body(Parser *parser, AstNode ***methods, int *count, int *capacity) 
 		global = global->parent;
 	}
 
-	AstNode *fn = NULL;
 	if ((err = func_rest(parser, name, false, global, key, true, line, col, &fn)) != ERR_OK) {
 		return err;
 	}
@@ -515,7 +937,7 @@ ErrorCode e_body(Parser *parser, AstNode ***methods, int *count, int *capacity) 
 }
 
 ErrorCode eb_next(Parser *parser, AstNode ***methods, int *count, int *capacity) {
-	if (parser->current_token.type == TOKEN_KW_DEF) {
+	if (parser->current_token.type == TOKEN_KW_DEF && !single_method) {
 		return e_body(parser, methods, count, capacity); /* rule 16 */
 	}
 	return ERR_OK; /* rule 17 */
@@ -725,6 +1147,20 @@ ErrorCode f_body_end(Parser *parser, AstNode **body_node) {
 			*body_node = NULL;
 			return err;
 		}
+		if (parser->current_ret_type == TYPE_UNKNOWN && !parser->ret_explicit) {
+			/* no declared type: the value of the last expression, otherwise Unit */
+			int cnt = (*body_node)->ast.block_node.block.count;
+			AstNode *last = cnt > 0 ? (*body_node)->ast.block_node.block.statements[cnt - 1] : NULL;
+			parser->inferred_ret = TYPE_UNIT;
+			if (last != NULL && last->kind == NODE_EXPR_STMT) {
+				DataType lt = last->ast.expr_stmt.child->type;
+				if (lt != TYPE_UNIT && lt != TYPE_UNKNOWN) {
+					last->kind = NODE_RETURN;
+					last->type = lt;
+					parser->inferred_ret = lt;
+				}
+			}
+		}
 		return ERR_OK;
 	}
 
@@ -737,11 +1173,14 @@ ErrorCode f_body_end(Parser *parser, AstNode **body_node) {
 	if ((err = parse_expr(parser, &expr, &expr_type)) != ERR_OK) {
 		return err;
 	}
-	if (!is_type_compatible(parser->current_ret_type, expr_type)) {
+	if (parser->current_ret_type != TYPE_UNIT && !is_type_compatible(parser->current_ret_type, expr_type)) {
 		fprintf(stderr, "\n[SEMANTIC DEBUG] Return type mismatch: expected=%d, got=%d\n", parser->current_ret_type,
 		        expr_type);
 		ast_free(expr);
 		return ERR_SEMANTIC_COMPATIBILITY;
+	}
+	if (parser->current_ret_type == TYPE_UNKNOWN && !parser->ret_explicit) {
+		parser->inferred_ret = expr_type;
 	}
 
 	AstNode *ret = ast_new_return(expr, line, col);
@@ -1477,7 +1916,19 @@ ErrorCode for_body(Parser *parser, AstNode **out_node) {
 }
 
 void parser_free(Parser *parser) {
-	if (parser != NULL) {
-		token_free(&parser->current_token);
+	if (parser == NULL) {
+		return;
 	}
+	for (int i = 0; i < parser->tok_count; i++) {
+		token_free(&parser->toks[i]);
+	}
+	free(parser->toks);
+	for (int i = 0; i < parser->def_count; i++) {
+		ast_free(parser->defs[i].node);
+		free(parser->defs[i].recv_name);
+	}
+	free(parser->defs);
+	parser->toks = NULL;
+	parser->defs = NULL;
+	parser->tok_count = parser->def_count = 0;
 }
