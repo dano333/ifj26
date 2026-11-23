@@ -8,6 +8,7 @@
 #define SYMTABLE_H
 
 #include "error.h"
+#include <stdbool.h>
 
 typedef enum { TYPE_INT, TYPE_DOUBLE, TYPE_STRING, TYPE_BOOLEAN, TYPE_UNIT, TYPE_UNKNOWN } DataType;
 
@@ -21,6 +22,12 @@ typedef struct Symbol {
 	struct Symbol *next; // Pointer for collision chaining in the bucket
 	int param_count;
 	DataType *param_types;
+	int list_count;    // number of parameter lists of a function: f(a)(b) = 2, "def f: Int" = 0
+	int *list_sizes;   // number of parameters in every list
+	bool ret_explicit; // the return type is written in the function header
+	bool defined;      // the body has been parsed (always true for built-ins)
+	bool in_progress;  // the body is being parsed right now (recursion check)
+	int def_index;     // index of the definition in the parser's table of definitions, -1 = none
 } Symbol;
 
 #define HASH_TABLE_SIZE 101 // A prime number for better hash distribution
