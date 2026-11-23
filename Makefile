@@ -38,7 +38,7 @@ format:
 
 zip:
 	cp ./docs/dokumentace.pdf ./dokumentace.pdf
-	zip -r ifj26_xrothda00.zip dokumentace.pdf rozdeleni rozsireni ./src/ Makefile
+	zip -r xrothda00.zip dokumentace.pdf rozdeleni rozsireni ./src/ Makefile
 	rm -f ./dokumentace.pdf
 
 build-check: check all

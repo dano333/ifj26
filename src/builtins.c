@@ -36,12 +36,6 @@ ErrorCode register_builtins(SymTable *global_table) {
 	p_subStr[1] = TYPE_INT;
 	p_subStr[2] = TYPE_INT;
 	add_builtin(global_table, "subStr", TYPE_STRING, p_subStr, 3);
-	// Alias support for subStr / substr
-	DataType *p_substr = malloc(sizeof(DataType) * 3);
-	p_substr[0] = TYPE_STRING;
-	p_substr[1] = TYPE_INT;
-	p_substr[2] = TYPE_INT;
-	add_builtin(global_table, "substr", TYPE_STRING, p_substr, 3);
 
 	// 5. toStr(value: Any): String
 	DataType *p_toStr = malloc(sizeof(DataType) * 1);

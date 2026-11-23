@@ -8,7 +8,7 @@ Tabuľka symbolov (\texttt{symtable.c}) je hašovacia tabuľka s reťazením syn
 Funkcia sa do globálnej tabuľky vloží ešte pred spracovaním parametrov a tela. Jej signatúra (návratový typ, počet a typy parametrov) sa doplní hneď po prečítaní hlavičky, takže rekurzívne volania sa kontrolujú rovnako ako iné. Parametre sú uložené ako nezmeniteľné premenné.
 
 \subsection{Vstavané funkcie}
-Modul \texttt{builtins.c} pred spustením parsera zaregistruje do globálneho rozsahu funkcie jazyka IFJ26 s ich signatúrami: \texttt{readLine}, \texttt{readInt}, \texttt{readDouble}, \texttt{print}, \texttt{toStr}, \texttt{toInt}, \texttt{strLength}, \texttt{ord}, \texttt{chr} a \texttt{subStr} (s aliasom \texttt{substr}). Parameter typu \texttt{TYPE\_UNKNOWN} (pri \texttt{print} a \texttt{toStr}) zastupuje ``ľubovoľný typ''. Pamäť s typmi parametrov vlastní záznam a uvoľní sa v \texttt{symtable\_free}.
+Modul \texttt{builtins.c} pred spustením parsera zaregistruje do globálneho rozsahu funkcie jazyka IFJ26 s ich signatúrami: \texttt{readLine}, \texttt{readInt}, \texttt{readDouble}, \texttt{print}, \texttt{toStr}, \texttt{toInt}, \texttt{strLength}, \texttt{ord}, \texttt{chr} a \texttt{subStr}. Parameter typu \texttt{TYPE\_UNKNOWN} (pri \texttt{print} a \texttt{toStr}) zastupuje ``ľubovoľný typ''. Pamäť s typmi parametrov vlastní záznam a uvoľní sa v \texttt{symtable\_free}.
 
 \subsection{Typový systém}
 \begin{itemize}
