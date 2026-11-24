@@ -88,9 +88,12 @@ static ErrorCode tokens_read_all(Parser *parser) {
 		Token t;
 		memset(&t, 0, sizeof t);
 		ErrorCode err = get_token(&t, parser->scanner);
-		if (err != ERR_OK) {
+		if (err == ERR_LEXICAL) {
 			parser->lex_err = err;
 			return ERR_OK;
+		}
+		if (err != ERR_OK) {
+			return err;
 		}
 		if (parser->tok_count == parser->tok_cap) {
 			int cap = parser->tok_cap == 0 ? 256 : parser->tok_cap * 2;
@@ -146,11 +149,16 @@ static void skip_eols(const Token *t, int n, int *k) {
 
 /* index of the '@' of an annotation directly in front of the `def` at i, otherwise i */
 static int def_start(const Token *t, int i) {
+	int start = i;
 	int j = i - 1;
+
 	while (j >= 0 && t[j].type == TOKEN_EOL) {
 		j--;
 	}
-	return (j >= 1 && t[j].type == TOKEN_ID_IDENT && t[j - 1].type == TOKEN_SE_AT) ? j - 1 : i;
+	if (j >= 1 && t[j].type == TOKEN_ID_IDENT && t[j - 1].type == TOKEN_SE_AT) {
+		start = j - 1;
+	}
+	return start;
 }
 
 /* one parenthesised parameter list starting at '(' ; ERR_PARSING marks a header the pre-pass does not understand */
@@ -344,8 +352,6 @@ ErrorCode parser_init(Parser *parser, Scanner *scanner, SymTable *global_table) 
 	return parser_next_token(parser);
 }
 
-static bool single_method = false; /* parse-ahead of one extension method: do not continue with its siblings */
-
 static FuncDefEntry *find_def(Parser *parser, int start) {
 	for (int i = 0; i < parser->def_count; i++) {
 		if (parser->defs[i].start == start) {
@@ -369,9 +375,9 @@ static ErrorCode parse_method_ahead(Parser *parser, const FuncDefEntry *def, Ast
 	err = symtable_insert(parser->current_scope, def->recv_name, SYMBOL_VAR, def->recv_type, 0);
 	if (err == ERR_OK) {
 		parser->ext_recv_type = def->recv_type;
-		single_method = true;
+		parser->single_method = true;
 		err = e_body(parser, &methods, &count, &capacity);
-		single_method = false;
+		parser->single_method = false;
 	}
 	scope_leave(parser, &scope);
 
@@ -957,7 +963,7 @@ ErrorCode e_body(Parser *parser, AstNode ***methods, int *count, int *capacity) 
 }
 
 ErrorCode eb_next(Parser *parser, AstNode ***methods, int *count, int *capacity) {
-	if (parser->current_token.type == TOKEN_KW_DEF && !single_method) {
+	if (parser->current_token.type == TOKEN_KW_DEF && !parser->single_method) {
 		return e_body(parser, methods, count, capacity); /* rule 16 */
 	}
 	return ERR_OK; /* rule 17 */
