@@ -34,6 +34,7 @@ typedef struct {
 	bool ret_explicit;      /* current function declared its return type */
 	DataType inferred_ret;  /* return type found by f_body_end for functions without a declared one */
 	TokenType prev_type;    /* type of the token consumed just before current_token */
+	bool single_method;     /* parse-ahead of one extension method: do not continue with its siblings */
 	/* the whole program is tokenized up front so that calls can refer to functions defined later */
 	Token *toks;
 	int tok_count, tok_cap, tok_pos; /* tok_pos = index of the next token to be delivered */
