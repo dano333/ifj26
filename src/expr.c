@@ -566,8 +566,8 @@ static ErrorCode check_binary(OpType op, DataType l, DataType r, DataType *out) 
 	case OP_LT:
 	case OP_LE:
 	case OP_GT:
-	case OP_GE: /* numeric only; allow Strings here if the assignment says so */
-		if (unk || (is_num(l) && is_num(r))) {
+	case OP_GE:
+		if (unk || (is_num(l) && is_num(r)) || (l == TYPE_STRING && r == TYPE_STRING)) {
 			*out = TYPE_BOOLEAN;
 			return ERR_OK;
 		}
