@@ -3,17 +3,17 @@ Kompletný zoznam zdrojových súborov prekladača:
 \begin{itemize}
     \item \texttt{main.c} -- Vstupný bod. Inicializuje skener, globálnu tabuľku symbolov a vstavané funkcie, spustí parser, uvoľní všetky zdroje a vráti chybový kód prekladača.
     \item \texttt{scanner.c} / \texttt{scanner.h} / \texttt{indent\_stack.c} / \texttt{indent\_stack.h} / \texttt{string\_buffer.c} / \texttt{string\_buffer.h} / \texttt{token.h} -- Lexikálna analýza (konečný automat, zásobník odsadenia, dynamický reťazcový buffer, definícia tokenov).
-    \item \texttt{parser.c} / \texttt{parser.h} -- Syntaktická analýza rekurzívnym zostupom (definície, príkazy, bloky, cykly) a tvorba AST; riadi rozsahy platnosti.
+    \item \texttt{parser.c} / \texttt{parser.h} -- Syntaktická analýza rekurzívnym zostupom (definície, príkazy, bloky, cykly) a tvorba AST; riadi rozsahy platnosti. Obsahuje aj pole načítaných tokenov a predbežný prechod, ktorý registruje hlavičky funkcií.
     \item \texttt{expr.c} / \texttt{expr.h} -- Precedenčná syntaktická analýza výrazov, tvorba uzlov výrazov, kontrola typov operátorov, volania funkcií, prístup k členom, interpolované reťazce a \texttt{if} výraz.
     \item \texttt{ast.c} / \texttt{ast.h} -- Abstraktný syntaktický strom: typy uzlov, konštruktory a rekurzívne uvoľnenie stromu.
     \item \texttt{symtable.c} / \texttt{symtable.h} -- Hašovacia tabuľka symbolov so zreťazenými rozsahmi platnosti.
-    \item \texttt{semantics.c} / \texttt{semantics.h} -- Sémantické kontroly: kompatibilita typov, zmeniteľnosť premenných, overenie volania funkcie.
+    \item \texttt{semantics.c} / \texttt{semantics.h} -- Sémantické kontroly: kompatibilita typov, zmeniteľnosť premenných, overenie volania funkcie (počet, štruktúra zoznamov a typy argumentov).
     \item \texttt{builtins.c} / \texttt{builtins.h} -- Registrácia vstavaných funkcií jazyka IFJ26 do globálnej tabuľky symbolov.
+    \item \texttt{generator.c} / \texttt{generator.h} -- Generovanie kódu IFJcode26 z hotového AST.
     \item \texttt{error.h} -- Zoznam chybových kódov prekladača.
 \end{itemize}
-Modul pre generovanie kódu (\texttt{codegen.c} / \texttt{codegen.h}) zatiaľ nie je súčasťou implementácie.
 
 \subsection{Závislosti modulov}
 \begin{center}
-\texttt{main} $\rightarrow$ \texttt{parser} $\rightarrow$ \{ \texttt{scanner}, \texttt{expr}, \texttt{semantics}, \texttt{ast}, \texttt{symtable} \}; \quad \texttt{expr} $\rightarrow$ \{ \texttt{parser} (\texttt{compare\_token}, \texttt{if\_control}), \texttt{semantics}, \texttt{ast} \}; \quad \texttt{semantics} $\rightarrow$ \texttt{symtable}; \quad \texttt{builtins} $\rightarrow$ \texttt{symtable}.
+\texttt{main} $\rightarrow$ \{ \texttt{parser}, \texttt{generator} \}; \quad \texttt{parser} $\rightarrow$ \{ \texttt{scanner}, \texttt{expr}, \texttt{semantics}, \texttt{ast}, \texttt{symtable} \}; \quad \texttt{generator} $\rightarrow$ \texttt{ast}; \quad \texttt{expr} $\rightarrow$ \{ \texttt{parser} (\texttt{compare\_token}, \texttt{if\_control}), \texttt{semantics}, \texttt{ast} \}; \quad \texttt{semantics} $\rightarrow$ \texttt{symtable}; \quad \texttt{builtins} $\rightarrow$ \texttt{symtable}.
 \end{center}

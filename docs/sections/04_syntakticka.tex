@@ -1,7 +1,7 @@
 \section{Syntaktická analýza a LL(1) gramatika}
 
 \subsection{Princíp}
-Syntaktická analýza je založená na rekurzívnom zostupe podľa LL(1) gramatiky uvedenej nižšie (modul \texttt{parser.c}). Každý neterminál je implementovaný jednou funkciou, ktorá podľa aktuálneho tokenu vyberie pravidlo, a tokeny sa spotrebúvajú funkciou \texttt{compare\_token}. Výrazy sa nespracúvajú rekurzívnym zostupom, ale samostatným precedenčným analyzátorom (modul \texttt{expr.c}, podsekcia \ref{sec:expr}), ktorý parser volá všade, kde gramatika obsahuje neterminál $\langle\text{EXP}\rangle$.
+Syntaktická analýza je založená na rekurzívnom zostupe podľa LL(1) gramatiky uvedenej nižšie (modul \texttt{parser.c}). Každý neterminál je implementovaný jednou funkciou, ktorá podľa aktuálneho tokenu vyberie pravidlo, a tokeny sa spotrebúvajú funkciou \texttt{compare\_token}. Tokeny parser neberie priamo zo skenera, ale z poľa, do ktorého ich pri inicializácii načíta všetky. Výrazy sa nespracúvajú rekurzívnym zostupom, ale samostatným precedenčným analyzátorom (modul \texttt{expr.c}, podsekcia \ref{sec:expr}), ktorý parser volá všade, kde gramatika obsahuje neterminál $\langle\text{EXP}\rangle$.
 
 Parser nielen overuje syntax, ale súčasne \textbf{buduje abstraktný syntaktický strom} (\texttt{ast.h}) a vykonáva sémantické kontroly (kapitola o sémantickej analýze). Každá funkcia neterminálu vracia ukazovateľ na vytvorený uzol cez výstupný parameter a vlastníctvo uzla prechádza na volajúceho. Pri chybe funkcia uvoľní všetko, čo si dovtedy alokovala, takže sa pri žiadnom chybovom výstupe neuniká pamäť.
 
@@ -13,6 +13,11 @@ Koreňom stromu je uzol \texttt{NODE\_PROGRAM} so zoznamom funkcií a rozšíren
     \item \textbf{výrazy:} literály, \texttt{NODE\_ID}, \texttt{NODE\_UNARY\_OP}, \texttt{NODE\_BINARY\_OP}, \texttt{NODE\_CALL}, \texttt{NODE\_MEMBER}, \texttt{NODE\_ISTRING} a \texttt{NODE\_IF\_EXPR}.
 \end{itemize}
 Každý uzol nesie dátový typ (\texttt{DataType}) určený pri jeho vytvorení a pozíciu v zdrojovom kóde. Funkcie a volania s viacerými zoznamami parametrov (\texttt{f(a)(b, c)}) ukladajú parametre a argumenty ``naplocho'' spolu s poľom \texttt{list\_sizes}, ktoré hovorí, koľko z nich patrí do ktorých zátvoriek. Telo funkcie zapísané jedným výrazom sa uloží ako blok s jediným uzlom \texttt{NODE\_RETURN}.
+
+\subsection{Predbežný prechod a dopredné volania}
+Aby sa dala funkcia volať pred svojou definíciou, prejde parser po načítaní tokenov celé pole ešte raz (funkcia \texttt{prepass}). Sleduje pritom odsadenie a hľadá kľúčové slovo \texttt{def} na najvyššej úrovni a v telách rozšírení. Z každej hlavičky prečíta názov, zoznamy parametrov a prípadný návratový typ a zaregistruje ju v globálnej tabuľke symbolov spolu s pozíciou definície v poli tokenov. Hlavičku, ktorej nerozumie, preskočí, a chybu ohlási až samotný parser, keď na ňu dôjde.
+
+Samotné parsovanie ide potom ako predtým rekurzívnym zostupom. Pri dosiahnutí \texttt{def} už existujúci symbol iba doplní, a ak je už označený ako definovaný, ide o redefiníciu. Návratový typ, ktorý nie je uvedený, sa odvodí z tela funkcie. Ak ho však potrebuje volanie skôr, než sa k telu dostane hlavný prechod, funkcia \texttt{resolve\_function} telo naparsuje vopred (\texttt{parse\_ahead}): uloží stav parsera, presunie sa na tokeny danej definície, vytvorí jej uzol a stav vráti späť. Hotový uzol sa zapamätá a keď hlavný prechod na túto definíciu príde, uzol len prevezme a tokeny preskočí. Poradie funkcií v AST tak zostáva rovnaké ako v zdrojovom texte. Ak sa funkcia bez uvedeného typu volá z vlastného tela (priamo alebo cez inú funkciu), jej typ ešte nie je známy a ide o chybu 6.
 
 \subsection{Rozsahy platnosti}
 Parser udržiava zreťazené tabuľky symbolov (\texttt{current\_scope}). Nový rozsah vzniká pre telo funkcie (spolu s parametrami), každý odsadený blok, jednoriadkový príkaz vo vetve \texttt{if}/\texttt{else} a v tele cyklu a pre cyklus \texttt{for} (riadiaca premenná je viditeľná iba v~strážach a tele). Premenná vzniká v tabuľke až po spracovaní svojho inicializačného výrazu, takže \texttt{val x = x + 1} sa správne odmietne ako použitie nedefinovaného identifikátora.
@@ -104,25 +109,38 @@ Výrazy spracúva modul \texttt{expr.c} pomocou zdola nahor riadeného preceden�
 \begin{tabular}{l|ccccccccccc}
  & \texttt{!} & $-_u$ & $*\;/$ & $+\;-$ & rel & $=\;\neq$ & \&\& & $\mid\mid$ & ( & ) & \$ \\
 \hline
-\texttt{!}, $-_u$ & $<$ & $<$ & $>$ & $>$ & $>$ & $>$ & $>$ & $>$ & $<$ & $>$ & $>$ \\
+\texttt{!} & $<$ & $<$ & $>$ & $>$ & $>$ & $>$ & $>$ & $>$ & $<$ & $>$ & $>$ \\
+$-_u$ & $<$ & $<$ & $>$ & $>$ & $>$ & $>$ & $>$ & $>$ & $<$ & $>$ & $>$ \\
 $*\;/$ & $<$ & $<$ & $>$ & $>$ & $>$ & $>$ & $>$ & $>$ & $<$ & $>$ & $>$ \\
 $+\;-$ & $<$ & $<$ & $<$ & $>$ & $>$ & $>$ & $>$ & $>$ & $<$ & $>$ & $>$ \\
-rel & $<$ & $<$ & $<$ & $<$ & $>$ & $>$ & $>$ & $>$ & $<$ & $>$ & $>$ \\
-$=\;\neq$ & $<$ & $<$ & $<$ & $<$ & $<$ & $>$ & $>$ & $>$ & $<$ & $>$ & $>$ \\
+rel & $<$ & $<$ & $<$ & $<$ & -- & $>$ & $>$ & $>$ & $<$ & $>$ & $>$ \\
+$=\;\neq$ & $<$ & $<$ & $<$ & $<$ & $<$ & -- & $>$ & $>$ & $<$ & $>$ & $>$ \\
 \&\& & $<$ & $<$ & $<$ & $<$ & $<$ & $<$ & $>$ & $>$ & $<$ & $>$ & $>$ \\
 $\mid\mid$ & $<$ & $<$ & $<$ & $<$ & $<$ & $<$ & $<$ & $>$ & $<$ & $>$ & $>$ \\
 ( & $<$ & $<$ & $<$ & $<$ & $<$ & $<$ & $<$ & $<$ & $<$ & $=$ & -- \\
+) & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
 \$ & $<$ & $<$ & $<$ & $<$ & $<$ & $<$ & $<$ & $<$ & $<$ & -- & acc \\
 \end{tabular}
-\caption{Precedenčná tabuľka (riadok = terminál na vrchole zásobníka, stĺpec = vstupný terminál; rel = \texttt{< <= > >=}).}
+\caption{Precedenčná tabuľka tak, ako je v poli \texttt{PREC} v \texttt{expr.c} (riadok = terminál na vrchole zásobníka, stĺpec = vstupný terminál; rel = \texttt{< <= > >=}). Značka $<$ je posun, $>$ redukcia, $=$ spojenie zátvoriek, \texttt{--} chyba a \emph{acc} koniec výrazu.}
 \end{table}
 
-Priorita od najvyššej: unárne \texttt{!} a \texttt{-}, \texttt{*} \texttt{/}, \texttt{+} \texttt{-}, relačné operátory, \texttt{==} \texttt{!=}, \texttt{\&\&}, \texttt{||}. Všetky binárne operátory sú ľavo asociatívne. Ďalšie vlastnosti:
+Priorita od najvyššej: unárne \texttt{!} a \texttt{-}, \texttt{*} \texttt{/}, \texttt{+} \texttt{-}, relačné operátory, \texttt{==} \texttt{!=}, \texttt{\&\&}, \texttt{||}. Operátory \texttt{+ - * /}, \texttt{\&\&} a \texttt{||} sú ľavo asociatívne. Relačné operátory (\texttt{< <= > >=}) a operátory rovnosti (\texttt{== !=}) asociatívne nie sú: v tabuľke je pre dvojicu rel--rel a rovnosť--rovnosť chyba, takže napríklad \texttt{a < b < c} je syntaktická chyba (kód 2). Ďalšie vlastnosti:
 \begin{itemize}
     \item \textbf{Unárne a binárne mínus} sa rozlišujú podľa predchádzajúceho symbolu: ak bol predtým operand, ide o binárny operátor, inak o unárny.
     \item \textbf{Operandy} (literály, identifikátory, volania funkcií, \texttt{if} výraz a interpolované reťazce) sa spracujú rekurzívnymi pomocnými funkciami a uložia sa na zásobník ako neterminál $E$. Identifikátor funkcie sa spracuje ako volanie vrátane viacerých zoznamov argumentov \texttt{f(a)(b, c)}.
-    \item \textbf{Prístup k členu} \texttt{x.meno} a \texttt{x.meno(args)} sa viaže silnejšie ako každý operátor; ak existuje funkcia s daným menom, prijímač sa kontroluje ako jej prvý argument.
+    \item \textbf{Prístup k členu} \texttt{x.meno} a \texttt{x.meno(args)} sa viaže silnejšie ako každý operátor. Hľadá sa v tomto poradí: metóda rozšírenia pre typ prijímača, funkcia s daným menom, ktorá berie prijímač ako prvý argument, a nakoniec vstavaný člen \texttt{toString}, \texttt{toInt}, \texttt{floor} alebo \texttt{length} (iba bez zátvoriek a len na vhodnom type).
     \item \textbf{Prázdne zátvorky} \texttt{()} tvoria hodnotu typu \texttt{Unit}.
     \item \textbf{Koniec výrazu} sa rozpozná na prvom tokene, ktorý ho nemôže predĺžiť (EOL, \texttt{then}, \texttt{do}, čiarka, nepárová \texttt{)} a pod.); analyzátor ho nespotrebuje.
     \item Pri každej redukcii $E \rightarrow E\ op\ E$ resp. $E \rightarrow op\ E$ sa kontrolujú typy operandov, určí sa typ výsledku a vytvorí sa uzol \texttt{NODE\_BINARY\_OP} resp. \texttt{NODE\_UNARY\_OP}.
 \end{itemize}
+
+\medskip
+\noindent Samotný analyzátor funguje takto. Vstupným bodom \texttt{expr.c} je funkcia \texttt{parse\_expr}, ktorá pracuje so zásobníkom položiek \texttt{PItem}, kde každá položka je buď terminál (operátor, zátvorka, koncová značka), alebo neterminál $E$ s podstromom AST a jeho typom. Na začiatku je na zásobníku iba značka \$ a príznak \texttt{prev\_operand} hovorí, či bol posledný spracovaný symbol operand. V cykle sa pre aktuálny token urobí tento postup:
+\begin{enumerate}
+    \item Ak za operandom nasleduje bodka, zavolá sa \texttt{parse\_member} a operand na vrchole zásobníka sa nahradí uzlom \texttt{NODE\_MEMBER}.
+    \item Ak token začína operand a predtým operand nebol, \texttt{parse\_primary} z neho vytvorí uzol a uloží ho na zásobník ako $E$. Podľa tokenu je to literál, interpolovaný reťazec (\texttt{interp\_string}), \texttt{if} výraz (\texttt{if\_control} z parsera) alebo identifikátor (\texttt{parse\_identifier}). Identifikátor premennej dostane typ zo symbolu. Pri funkcii sa načítajú zoznamy argumentov (\texttt{parse\_arg\_lists}), zavolá sa \texttt{resolve\_function}, \texttt{validate\_function\_call} skontroluje počet, štruktúru zoznamov a typy a vznikne uzol \texttt{NODE\_CALL}.
+    \item Dvojica \texttt{()} sa nahradí hodnotou \texttt{Unit}.
+    \item Inak sa token funkciou \texttt{classify} priradí k terminálu tabuľky. Token, ktorý výraz nemôže predĺžiť, sa zmení na koncovú značku \$.
+    \item Potom sa porovná terminál najbližšie k vrcholu zásobníka so vstupným terminálom v tabuľke \texttt{PREC}. Pri posune sa vstupný terminál uloží a token sa spotrebuje. Pri redukcii sa zavolá \texttt{reduce}, ktorá odoberie operátor a operandy, skontroluje typy (\texttt{check\_unary}, \texttt{check\_binary}), vytvorí uzol a vloží späť výsledné $E$. Pri \texttt{=} sa zátvorky odstránia. Chyba v tabuľke ukončí analýzu kódom 2, nevhodné typy operandov pri redukcii kódom 6 a pri \emph{acc} je výraz hotový.
+\end{enumerate}
+Po prijatí musí na zásobníku zostať práve značka \$ a jediné $E$, ktorého uzol a typ sa vrátia volajúcemu. Zásobník vlastní všetky ešte nezačlenené podstromy, takže pri chybe v ktoromkoľvek kroku sa uvoľnia a nič neunikne.

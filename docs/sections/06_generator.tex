@@ -1,0 +1,42 @@
+\section{Generátor kódu}
+
+\subsection{Architektura a princip generování}
+Generování cílového kódu v jazyce \texttt{IFJcode26} zajišťuje modul \texttt{generator.c} (rozhraní v~\texttt{generator.h}). Inicializuje se funkcí \texttt{generator\_init(FILE~*out)} a spouští se nad hotovým, typově anotovaným stromem funkcí \texttt{generate\_program(AstNode~*node)}. Na konci funkce \texttt{generator\_cleanup} uvolní všechny interní tabulky a dynamicky alokované řetězce (spravované přes \texttt{pool\_add} / \texttt{pool\_printf}). Interní chyba alokace nebo neočekávaný stav uzlu nastaví \texttt{gen\_err = ERR\_INTERNAL\_COMPILER}.
+
+Na začátku \texttt{generate\_program} generátor shromáždí všechny uživatelské funkce a metody rozšíření do pole \texttt{funcs} a dohledá funkci označenou \texttt{is\_main}. Následně vygeneruje hlavičku \texttt{.IFJcode26}, globální pomocné proměnné \texttt{GF@\_discard}, \texttt{GF@\_a}, \texttt{GF@\_b} a \texttt{GF@\_r}, zavolá \texttt{\$fn\_<main\_name>} a program ukončí instrukcí \texttt{EXIT int@0}. Poté připojí vestavěné funkce (\texttt{RUNTIME}) a postupně vygeneruje všechny funkce a metody rozšíření.
+
+\subsection{Správa rámců a unikátních proměnných}
+Každá funkce a metoda (\texttt{gen\_function}) začíná návěštím (\texttt{\$fn\_<jméno>} nebo \texttt{\$ext\_<Typ>\_<jméno>}), vytvoří si vlastní lokální rámec instrukcí \texttt{PUSHFRAME}, zadefinuje všechny své lokální proměnné a proměnné cyklů (\texttt{DEFVAR LF@...}) a před návratem rámec zruší pomocí \texttt{POPFRAME} a \texttt{RETURN}.
+
+Aby se předešlo kolizi jmen při vnoření bloků a zastiňování proměnných:
+\begin{itemize}
+    \item \textbf{Deklarace v těle funkce:} Funkce \texttt{collect} projde tělo funkce před generováním instrukcí a pro každou \texttt{NODE\_VAL\_DEF} / \texttt{NODE\_VAR\_DEF} a cyklus \texttt{NODE\_FOR} (řídicí proměnná, \texttt{\_limit} a \texttt{\_step}) vytvoří unikátní název ve tvaru \texttt{<jméno>\%<číslo>} (tabulka \texttt{decls}). Všechny \texttt{DEFVAR} se tak vygenerují na začátku funkce a nikdy se neopakují ani v cyklech.
+    \item \textbf{Viditelnost během průchodu:} Viditelné proměnné v aktuálním rozsahu se sledují na zásobníku \texttt{vars} se značkami bloků (\texttt{scope\_push} / \texttt{scope\_pop}). Parametry mají jména \texttt{\%p0}, \texttt{\%p1}, \dots\ (u metod rozšíření je \texttt{\%p0} příjemce).
+\end{itemize}
+
+\subsection{Výrazy, konverze a interpolované řetězce}
+Vyhodnocování výrazů (\texttt{gen\_expr}) využívá datový zásobník interpreta (\texttt{PUSHS} / \texttt{POPS}) a probíhá v post-order pořadí:
+\begin{itemize}
+    \item \textbf{Literály a řetězce:} Celočíselné literály se ukládají jako \texttt{int@...}, desetinné jako \texttt{float@\%a}, logické jako \texttt{bool@true}/\texttt{bool@false} a \texttt{Unit} jako \texttt{nil@nil}. Řetězcové literály (\texttt{emit\_string\_const}) zapisují znaky s ASCII kódem $\le 32$, $35$ (\texttt{\#}), $92$ (\texttt{\textbackslash{}}) nebo $\ge 127$ jako escape sekvenci \texttt{\textbackslash{}xyz}.
+    \item \textbf{Konverze \texttt{Int} $\rightarrow$ \texttt{Double}:} Jedinou implicitní konverzí je \texttt{Int} na \texttt{Double} (\texttt{gen\_coerce} přes \texttt{INT2FLOATS}). Při smíšených binárních operacích nad \texttt{Int} a \texttt{Double} (\texttt{gen\_binary}) se oba operandy převedou na \texttt{Double}; pokud jsou oba \texttt{Int}, celočíselné dělení používá \texttt{IDIVS} (u~\texttt{Double} \texttt{DIVS}).
+    \item \textbf{Logické spojky a porovnání:} Operátory \texttt{\&\&} a \texttt{||} se vyhodnocují líně (\emph{short-circuit}) se skoky na \texttt{\$L<id>\_short}. Operátory $\le$ (\texttt{OP\_LE}) a $\ge$ (\texttt{OP\_GE}) se realizují jako negace \texttt{GTS}, resp. \texttt{LTS} pomocí \texttt{NOTS}, nerovnost \texttt{!=} jako \texttt{EQS} a \texttt{NOTS}.
+    \item \textbf{Interpolované řetězce (\texttt{NODE\_ISTRING}):} Začínají vložením prázdného řetězce \texttt{string@}. Každá část se vyhodnotí, v případě jiného typu než \texttt{String} se zkonvertuje přes \texttt{\$ifj\_toStr} a připojí se instrukcí \texttt{CONCAT} přes globální proměnné \texttt{GF@\_a}, \texttt{GF@\_b} a \texttt{GF@\_r}.
+\end{itemize}
+
+\subsection{Volání funkcí a přístup ke členům}
+Volání uživatelských funkcí, vestavěných funkcí (\texttt{\$ifj\_...}) i metod rozšíření (\texttt{gen\_invoke}) nejprve vyhodnotí příjemce (pokud jde o metodu nebo volání přes tečku) a všechny argumenty na datový zásobník s případnou konverzí na typ parametru. Poté se vytvoří nový rámec (\texttt{CREATEFRAME}), naplní se proměnné \texttt{TF@\%p0}, \texttt{TF@\%p1}, \dots\ v opačném pořadí od vrcholu zásobníku a zavolá se cílové návěští (\texttt{CALL}).
+
+Funkce \texttt{gen\_member} řeší \texttt{x.jméno} a \texttt{x.jméno(args)} v tomto pořadí: nejprve hledá metodu rozšíření pro typ příjemce, poté vestavěné členy (\texttt{toString} $\rightarrow$ \texttt{\$ifj\_toStr}, \texttt{length} $\rightarrow$ \texttt{\$ifj\_strLength}, \texttt{toInt} $\rightarrow$ \texttt{\$ifj\_toInt}, \texttt{floor} $\rightarrow$ \texttt{\$ifj\_floor}) a nakonec obyčejnou funkci s příjemcem jako prvním argumentem. Návratová hodnota funkce zůstává na vrcholu datového zásobníku; pokud příkaz \texttt{NODE\_EXPR\_STMT} nebo funkce typu \texttt{Unit} hodnotu nepotřebuje, odebere se do \texttt{GF@\_discard}.
+
+\subsection{Podmínky, cykly \texttt{while} a \texttt{for}}
+Generátor přiděluje každému větvení nebo cyklu unikátní číselné ID (\texttt{new\_label}):
+\begin{itemize}
+    \item \textbf{Větvení (\texttt{NODE\_IF\_STMT}, \texttt{NODE\_IF\_EXPR}):} Vyhodnotí podmínku a při hodnotě \texttt{false} skočí na \texttt{\$L<id>\_else} (\texttt{gen\_jump\_if\_false}). U \texttt{NODE\_IF\_EXPR} se hodnota každé větve získá přes \texttt{gen\_value} (v bloku se vrátí hodnota posledního výrazu, jinak \texttt{nil@nil}) a přetypuje na cílový typ uzlu.
+    \item \textbf{Cyklus \texttt{while} (\texttt{NODE\_WHILE}):} Na návěští \texttt{\$L<id>\_start} vyhodnotí podmínku, při \texttt{false} skočí na \texttt{\$L<id>\_end}, vykoná tělo a skočí zpět na \texttt{\$L<id>\_start}.
+    \item \textbf{Cyklus \texttt{for} (\texttt{NODE\_FOR}):} Hranice \texttt{from}, \texttt{to} a případný krok \texttt{by} (jinak \texttt{int@1}) se vyhodnotí jednou před první iterací do proměnných v \texttt{LF}. Nulový krok ukončí program s chybovým kódem \texttt{40} (\texttt{EXIT int@40}). V každé iteraci (\texttt{\$L<id>\_test}) se otestuje hranice podle znaménka kroku a režimu \texttt{to} / \texttt{until}, v novém rozsahu se zpřístupní řídicí proměnná, postupně se vyhodnotí všechny stráže (\emph{guards}; při \texttt{false} se skočí na \texttt{\$L<id>\_next}), vykoná se tělo cyklu a na \texttt{\$L<id>\_next} se přičte krok.
+\end{itemize}
+
+\subsection{Runtime vestavěných funkcí}
+Řetězec \texttt{RUNTIME} definuje instrukce \texttt{IFJcode26} pro vestavěné funkce jazyka IFJ26: \texttt{\$ifj\_print} (hodnotu \texttt{nil} vypisuje jako \texttt{()}), \texttt{\$ifj\_toStr} (převádí \texttt{int}, \texttt{float}, \texttt{bool}, \texttt{string} a \texttt{nil} $\rightarrow$ \texttt{()}), \texttt{\$ifj\_readLine}, \texttt{\$ifj\_readInt}, \texttt{\$ifj\_readDouble}, \texttt{\$ifj\_readBoolean} (při \texttt{nil}/EOF vracejí výchozí hodnoty \texttt{""}, \texttt{0}, \texttt{0.0}, resp. \texttt{false}), \texttt{\$ifj\_strLength}, \texttt{\$ifj\_ord} (mimo rozsah vrací \texttt{-1}), \texttt{\$ifj\_chr}, \texttt{\$ifj\_subStr} (neplatný rozsah končí \texttt{EXIT int@40}), \texttt{\$ifj\_toInt} a \texttt{\$ifj\_floor}.
+
+\end{document}

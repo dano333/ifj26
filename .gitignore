@@ -2,6 +2,7 @@
 **/.DS_Store
 
 ifj26
+examples
 **/*.zip
 **/*.log
 is_it_ok.sh
