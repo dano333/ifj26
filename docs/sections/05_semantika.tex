@@ -3,23 +3,23 @@
 Sémantická analýza nie je samostatný prechod. Prebieha priebežne \textbf{počas syntaktickej analýzy}: parser pri spracovaní každého príkazu a pri každej redukcii vo výraze volá funkcie modulov \texttt{symtable}, \texttt{semantics} a \texttt{builtins}, takže už vytvorený AST je typovo anotovaný (každý uzol má vyplnené pole \texttt{type}).
 
 \subsection{Tabuľka symbolov}
-Tabuľka symbolov (\texttt{symtable.c}) je hašovacia tabuľka s reťazením synonym (funkcia DJB2, 101 záznamov). Každý rozsah platnosti má vlastnú tabuľku s odkazom na rodičovský rozsah, vyhľadávanie (\texttt{symtable\_lookup}) postupuje od aktuálneho rozsahu ku globálnemu, kým \texttt{symtable\_lookup\_local} hľadá iba v aktuálnom. Záznam obsahuje názov, druh (\texttt{SYMBOL\_VAR}, \texttt{SYMBOL\_VAL}, \texttt{SYMBOL\_FUNC}), dátový typ, príznak zmeniteľnosti a pre funkcie počet a typy parametrov. Vloženie už existujúceho názvu v tom istom rozsahu vráti \texttt{ERR\_SEMANTIC\_REDEFINITION}.
+Tabuľka symbolov (\texttt{symtable.c}) je hašovacia tabuľka s reťazením synonym (funkcia DJB2, 101 záznamov). Každý rozsah platnosti má vlastnú tabuľku s odkazom na rodičovský rozsah, vyhľadávanie (\texttt{symtable\_lookup}) postupuje od aktuálneho rozsahu ku globálnemu, kým \texttt{symtable\_lookup\_local} hľadá iba v aktuálnom. Záznam obsahuje názov, druh (\texttt{SYMBOL\_VAR}, \texttt{SYMBOL\_VAL}, \texttt{SYMBOL\_FUNC}), dátový typ, príznak zmeniteľnosti a pre funkcie počet a typy parametrov, počet zoznamov parametrov a veľkosť každého z nich (\texttt{list\_count}, \texttt{list\_sizes}), príznak, či je návratový typ uvedený v hlavičke (\texttt{ret\_explicit}), a príznaky \texttt{defined} a \texttt{in\_progress} (telo je už spracované, resp. sa práve spracúva). Vloženie už existujúceho názvu v tom istom rozsahu vráti \texttt{ERR\_SEMANTIC\_REDEFINITION}.
 
-Funkcia sa do globálnej tabuľky vloží ešte pred spracovaním parametrov a tela. Jej signatúra (návratový typ, počet a typy parametrov) sa doplní hneď po prečítaní hlavičky, takže rekurzívne volania sa kontrolujú rovnako ako iné. Parametre sú uložené ako nezmeniteľné premenné.
+Funkcie a metódy rozšírení sa do globálnej tabuľky vkladajú ešte pred parsovaním tiel, v predbežnom prechode nad tokenmi (kapitola o syntaktickej analýze). Preto možno funkciu volať aj pred jej definíciou. Keď na definíciu príde hlavný prechod, signatúru zapíše znova z už spracovaných parametrov a symbol označí ako definovaný. Druhá definícia s rovnakým názvom tak skončí chybou 4. Metódy rozšírení sa ukladajú pod názvom \texttt{Typ.meno}, napr. \texttt{Int.triple}. Parametre sú uložené ako nezmeniteľné premenné.
 
 \subsection{Vstavané funkcie}
-Modul \texttt{builtins.c} pred spustením parsera zaregistruje do globálneho rozsahu funkcie jazyka IFJ26 s ich signatúrami: \texttt{readLine}, \texttt{readInt}, \texttt{readDouble}, \texttt{print}, \texttt{toStr}, \texttt{toInt}, \texttt{strLength}, \texttt{ord}, \texttt{chr} a \texttt{subStr}. Parameter typu \texttt{TYPE\_UNKNOWN} (pri \texttt{print} a \texttt{toStr}) zastupuje ``ľubovoľný typ''. Pamäť s typmi parametrov vlastní záznam a uvoľní sa v \texttt{symtable\_free}.
+Modul \texttt{builtins.c} pred spustením parsera zaregistruje do globálneho rozsahu funkcie jazyka IFJ26 s ich signatúrami: \texttt{readLine}, \texttt{readInt}, \texttt{readDouble}, \texttt{readBoolean}, \texttt{print}, \texttt{toStr}, \texttt{toInt}, \texttt{strLength}, \texttt{ord}, \texttt{chr} a \texttt{subStr}. Každá vstavaná funkcia má práve jeden zoznam parametrov (aj prázdny, napr. \texttt{readInt()}). Parameter typu \texttt{TYPE\_UNKNOWN} (pri \texttt{print} a \texttt{toStr}) zastupuje ``ľubovoľný typ''. Členy \texttt{toString}, \texttt{toInt}, \texttt{floor} a \texttt{length} sa nehľadajú v tabuľke symbolov, spracúva ich \texttt{expr.c}. Pamäť s typmi parametrov vlastní záznam a uvoľní sa v \texttt{symtable\_free}.
 
 \subsection{Typový systém}
 \begin{itemize}
     \item \textbf{Kompatibilita priradenia} (\texttt{is\_type\_compatible}): rovnaké typy, alebo \texttt{Int} do \texttt{Double}. Neznámy typ (\texttt{TYPE\_UNKNOWN}) je kompatibilný so všetkým, aby sa jedna chyba nešírila ďalej.
     \item \textbf{Aritmetika:} \texttt{+ - * /} nad \texttt{Int}/\texttt{Double}; ak je aspoň jeden operand \texttt{Double}, výsledok je \texttt{Double}. Operátor \texttt{+} je navyše definovaný nad dvojicou \texttt{String}.
-    \item \textbf{Relačné operátory} \texttt{< <= > >=} sú definované nad číslami, výsledok je \texttt{Boolean}.
+    \item \textbf{Relačné operátory} \texttt{< <= > >=} sú definované nad číslami a nad dvojicou reťazcov (lexikografické porovnanie), výsledok je \texttt{Boolean}. Porovnanie reťazca s číslom je chyba 6.
     \item \textbf{Rovnosť} \texttt{== !=} vyžaduje rovnaké (alebo obe číselné) typy, výsledok je \texttt{Boolean}.
     \item \textbf{Logické operátory} \texttt{\&\&}, \texttt{||} a \texttt{!} vyžadujú \texttt{Boolean}. Unárne \texttt{-} vyžaduje číslo.
     \item \textbf{Podmienky} v \texttt{if}, \texttt{while} a stráže cyklu \texttt{for} musia byť typu \texttt{Boolean}; hranice a krok cyklu \texttt{for} typu \texttt{Int}.
     \item \textbf{\texttt{if} ako výraz:} ak sa typy oboch vetiev líšia, ale obe sú číselné, výsledkom je \texttt{Double}; inak musia byť zhodné.
-    \item \textbf{Odvodenie typu:} pri \texttt{val}/\texttt{var} bez uvedeného typu sa typ premennej odvodí z inicializačného výrazu.
+    \item \textbf{Odvodenie typu:} pri \texttt{val}/\texttt{var} bez uvedeného typu sa typ premennej odvodí z inicializačného výrazu. Funkcia bez uvedeného návratového typu dostane typ výrazu v tele, resp. typ posledného výrazu bloku, ak je to hodnota, inak \texttt{Unit}. Funkcia s odvodeným typom nesmie používať \texttt{return} a nesmie sa volať z vlastného tela (chyba 6).
 \end{itemize}
 
 \subsection{Kontroly a chybové kódy}
@@ -30,14 +30,13 @@ Modul \texttt{builtins.c} pred spustením parsera zaregistruje do globálneho ro
 \endhead
 3 & \texttt{ERR\_SEMANTIC\_UNDEFINED} & použitie nedefinovanej premennej alebo funkcie; chýbajúca funkcia s anotáciou \texttt{@main} \\
 4 & \texttt{ERR\_SEMANTIC\_REDEFINITION} & opätovná definícia funkcie alebo premennej v tom istom rozsahu \\
-5 & \texttt{ERR\_SEMANTIC\_FUNCTION\_CALL} & zlý počet alebo typ argumentov volania; parametre pri funkcii \texttt{@main} \\
-6 & \texttt{ERR\_SEMANTIC\_COMPATIBILITY} & nekompatibilný typ pri inicializácii, priradení, \texttt{return} alebo vetvách \texttt{if} výrazu \\
-7 & \texttt{ERR\_SEMANTIC\_FORBIDDEN\_WRITING} & zápis do \texttt{val}, parametra funkcie alebo funkcie \\
-8 & \texttt{ERR\_SEMANTIC\_TYPE} & nepovolené typy operandov operátora alebo nebooleovská podmienka \\
+5 & \texttt{ERR\_SEMANTIC\_FUNCTION\_CALL} & zlý počet alebo typ argumentov volania, nesprávne rozdelenie argumentov do zoznamov (napr. \texttt{f(1,2,3)} pre \texttt{def f(a,b)(c)}, alebo \texttt{f} namiesto \texttt{f()}), volanie niečoho, čo nie je funkcia; parametre pri funkcii \texttt{@main} \\
+6 & \texttt{ERR\_SEMANTIC\_COMPATIBILITY} & nekompatibilný typ pri inicializácii, priradení, \texttt{return} alebo vetvách \texttt{if} výrazu; nepovolené typy operandov operátora; nebooleovská podmienka; hranice a krok cyklu \texttt{for} iné než \texttt{Int}; telo funkcie bez hodnoty; rekurzia bez uvedeného návratového typu; \texttt{@main} s iným návratovým typom než \texttt{Unit} \\
+7 & \texttt{ERR\_SEMANTIC\_FORBIDDEN\_WRITING} & zápis do \texttt{val}, parametra funkcie alebo riadiacej premennej cyklu \texttt{for} \\
 \bottomrule
 \end{longtable}
 
-Funkcia \texttt{validate\_function\_call} overí existenciu symbolu, že ide o funkciu, počet argumentov a kompatibilitu typu každého argumentu, a vráti návratový typ funkcie. Rovnakú kontrolu používa volanie cez bodku (\texttt{x.f(a)}), kde sa prijímač počíta ako prvý argument. Funkcia \texttt{check\_variable\_assignment} overí, že cieľ priradenia je zmeniteľná premenná (\texttt{var}). Pri návrate z funkcie (\texttt{return} aj jednovýrazové telo) sa typ výrazu porovnáva s deklarovaným návratovým typom.
+Funkcia \texttt{validate\_function\_call} overí existenciu symbolu, že ide o funkciu, počet zoznamov argumentov a počet argumentov v každom z nich, celkový počet argumentov a kompatibilitu typu každého argumentu, a vráti návratový typ funkcie. Funkcia bez zátvoriek (\texttt{def f: Int}) má nula zoznamov, funkcia \texttt{def f(): Int} jeden prázdny, takže volanie sa musí zhodovať so zápisom v definícii. Rovnakú kontrolu používa volanie cez bodku (\texttt{x.f(a)}), kde sa prijímač počíta ako prvý argument prvého zoznamu. Pred kontrolou sa zavolá \texttt{resolve\_function}, ktorá pri funkcii s ešte neznámym odvodeným typom naparsuje jej telo vopred. Funkcia \texttt{check\_variable\_assignment} overí, že cieľ priradenia je zmeniteľná premenná (\texttt{var}). Pri návrate z funkcie (\texttt{return} aj jednovýrazové telo) sa typ výrazu porovnáva s deklarovaným návratovým typom, pričom funkcia typu \texttt{Unit} hodnotu jednovýrazového tela zahodí. Telo s iným návratovým typom než \texttt{Unit} musí končiť hodnotou: \texttt{return}, výrazom (ten sa zmení na \texttt{NODE\_RETURN}) alebo príkazom \texttt{if} s vetvou \texttt{else}, ktorej obe vetvy takto končia.
 
 \subsection{Známe obmedzenia}
-Spracovanie je jednoprechodové, preto funkciu možno volať až po jej definícii v zdrojovom texte. Jazyk zatiaľ nevyužíva výsledky tejto analýzy na generovanie kódu (modul \texttt{codegen} nie je implementovaný).
+Typ funkcie bez uvedeného návratového typu sa určuje iba z jej tela, preto taká funkcia nemôže byť rekurzívna ani použiť \texttt{return}.

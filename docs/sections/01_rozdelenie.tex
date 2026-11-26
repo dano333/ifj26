@@ -7,4 +7,12 @@
 Kód bol spravovaný v Gite s využitím Pull Requestov (PR) na samostatných vetvách. Každý PR prechádzal povinným code review a schválením druhým členom tímu pred merge do hlavnej vetvy \texttt{main}.
 
 \subsection{Testovanie a štýl}
-Na testovanie boli využité unit testy a end-to-end integračné testy overujúce chybové i nechybové stavy prekladača. Kód sa striktne riadi formátovacím štýlom nástroja \texttt{clang-format}.
+Prekladač sme testovali sadou testovacích programov v adresári \texttt{tests/}, ktorú spúšťa skript \texttt{run\_tests.sh}. Skript prekladač zostaví a pustí ho na každý program zo vstupu. Testy sú troch druhov:
+\begin{itemize}
+    \item \textbf{platné programy} (\texttt{tests/valid}) -- prekladač ich musí prijať s návratovým kódom 0,
+    \item \textbf{chybné programy} (\texttt{tests/errors}) -- očakávaný návratový kód je daný začiatkom názvu súboru (napr. \texttt{e5\_\ldots} očakáva kód 5), pokrývajú lexikálne, syntaktické a sémantické chyby,
+    \item \textbf{snímky AST} (\texttt{tests/ast}) -- pomocný program \texttt{tools/ast\_dump.c} vypíše vytvorený abstraktný strom do textu a ten sa porovná s uloženým očakávaným výstupom.
+\end{itemize}
+Skript vie každý test spustiť aj pod nástrojom \texttt{valgrind}, aby sa odhalili úniky pamäte a neplatné prístupy. Nejde teda o unit testy jednotlivých funkcií, ale o testy celého prekladača (vstupný program $\rightarrow$ návratový kód, resp. AST), takže zodpovedajú skôr integračným testom. Zatiaľ pokrývajú lexikálnu, syntaktickú a sémantickú analýzu, nie generovaný kód.
+
+Kód sa striktne riadi formátovacím štýlom nástroja \texttt{clang-format}.
