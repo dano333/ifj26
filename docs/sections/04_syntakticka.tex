@@ -25,79 +25,112 @@ Parser udržiava zreťazené tabuľky symbolov (\texttt{current\_scope}). Nový 
 \subsection{LL(1) gramatika}
 \small
 \noindent
-\begin{longtable}{p{0.5cm} p{3.0cm} p{6.2cm} p{3.8cm}}
+\begin{longtable}{l l l}
 \toprule
-\textbf{Č.} & \textbf{Neterminál} & \textbf{Pravidlo (pravá strana)} & \textbf{Stručný popis} \\
+\textbf{Č.} & \textbf{Neterminál} & \textbf{Pravidlo} \\
 \midrule
 \endhead
 
 \bottomrule
 \endfoot
 
-1 & $\langle\text{PROLOG}\rangle$ & $\rightarrow$ import id . * EOL $\langle\text{F\_LIST}\rangle$ EOF & Začiatok programu; identifikátor musí byť \texttt{ifj26}. \\
-2 & $\langle\text{F\_LIST}\rangle$ & $\rightarrow$ $\langle\text{F\_DEF}\rangle$ $\langle\text{F\_LIST}\rangle$ & Ďalšia definícia funkcie. \\
-3 & $\langle\text{F\_LIST}\rangle$ & $\rightarrow$ $\langle\text{EXTENSION}\rangle$ $\langle\text{F\_LIST}\rangle$ & Ďalšie rozšírenie typu. \\
-4 & $\langle\text{F\_LIST}\rangle$ & $\rightarrow$ $\varepsilon$ & Koniec zoznamu definícií. \\
-5 & $\langle\text{F\_DEF}\rangle$ & $\rightarrow$ $\langle\text{ANNOTATION}\rangle$ def id $\langle\text{PARAM\_LISTS}\rangle$ $\langle\text{D\_TYPE}\rangle$ = $\langle\text{F\_BODY\_END}\rangle$ & Definícia funkcie s voliteľnou anotáciou. \\
-6 & $\langle\text{PARAM\_LISTS}\rangle$ & $\rightarrow$ ( $\langle\text{PARAMETER}\rangle$ ) $\langle\text{PARAM\_LISTS}\rangle$ & Zoznam parametrov; môže ich byť viac (currying). \\
-7 & $\langle\text{PARAM\_LISTS}\rangle$ & $\rightarrow$ $\varepsilon$ & Koniec zoznamov parametrov. \\
-8 & $\langle\text{F\_BODY\_END}\rangle$ & $\rightarrow$ EOL* INDENT $\langle\text{F\_BODY}\rangle$ DEDENT & Viacriadkové telo funkcie. \\
-9 & $\langle\text{F\_BODY\_END}\rangle$ & $\rightarrow$ $\langle\text{EXP}\rangle$ EOL & Telo tvorené jedným výrazom (implicitný \texttt{return}). \\
-10 & $\langle\text{ANNOTATION}\rangle$ & $\rightarrow$ @ main $\langle\text{NEW\_LINE}\rangle$ & Označenie funkcie \texttt{@main}. \\
-11 & $\langle\text{ANNOTATION}\rangle$ & $\rightarrow$ $\varepsilon$ & Funkcia bez anotácie. \\
-12 & $\langle\text{NEW\_LINE}\rangle$ & $\rightarrow$ EOL & Nový riadok za anotáciou. \\
-13 & $\langle\text{NEW\_LINE}\rangle$ & $\rightarrow$ $\varepsilon$ & Bez nového riadku. \\
-14 & $\langle\text{EXTENSION}\rangle$ & $\rightarrow$ extension ( id : $\langle\text{TYPE}\rangle$ ) EOL INDENT $\langle\text{E\_BODY}\rangle$ DEDENT & Rozšírenie typu o metódy; \texttt{id} je prijímač. \\
-15 & $\langle\text{E\_BODY}\rangle$ & $\rightarrow$ def id $\langle\text{PARAM\_LISTS}\rangle$ $\langle\text{D\_TYPE}\rangle$ = $\langle\text{F\_BODY\_END}\rangle$ $\langle\text{EB\_NEXT}\rangle$ & Metóda rozšírenia. \\
-16 & $\langle\text{EB\_NEXT}\rangle$ & $\rightarrow$ $\langle\text{E\_BODY}\rangle$ & Ďalšia metóda. \\
-17 & $\langle\text{EB\_NEXT}\rangle$ & $\rightarrow$ $\varepsilon$ & Koniec metód. \\
-18 & $\langle\text{D\_TYPE}\rangle$ & $\rightarrow$ : $\langle\text{TYPE}\rangle$ & Explicitný typ. \\
-19 & $\langle\text{D\_TYPE}\rangle$ & $\rightarrow$ $\varepsilon$ & Typ nie je uvedený (odvodí sa). \\
-20--24 & $\langle\text{TYPE}\rangle$ & $\rightarrow$ Int $\mid$ Double $\mid$ String $\mid$ Unit $\mid$ Boolean & Dátové typy. \\
-25 & $\langle\text{PARAMETER}\rangle$ & $\rightarrow$ id : $\langle\text{TYPE}\rangle$ $\langle\text{PARAM\_NEXT}\rangle$ & Prvý parameter. \\
-26 & $\langle\text{PARAMETER}\rangle$ & $\rightarrow$ $\varepsilon$ & Prázdny zoznam parametrov. \\
-27 & $\langle\text{PARAM\_NEXT}\rangle$ & $\rightarrow$ , $\langle\text{PARAM\_TAIL}\rangle$ & Pokračovanie zoznamu. \\
-28 & $\langle\text{PARAM\_NEXT}\rangle$ & $\rightarrow$ $\varepsilon$ & Koniec zoznamu. \\
-29 & $\langle\text{PARAM\_TAIL}\rangle$ & $\rightarrow$ id : $\langle\text{TYPE}\rangle$ $\langle\text{PARAM\_NEXT}\rangle$ & Ďalší parameter. \\
-30 & $\langle\text{PARAM\_TAIL}\rangle$ & $\rightarrow$ $\varepsilon$ & Koniec zoznamu (koncová čiarka). \\
-31 & $\langle\text{F\_BODY}\rangle$ & $\rightarrow$ $\langle\text{STMT}\rangle$ $\langle\text{STMT\_NEXT}\rangle$ & Telo bloku. \\
-32 & $\langle\text{STMT\_NEXT}\rangle$ & $\rightarrow$ EOL $\langle\text{STMT}\rangle$ $\langle\text{STMT\_NEXT}\rangle$ & Príkazy oddelené koncom riadku. \\
-33 & $\langle\text{STMT\_NEXT}\rangle$ & $\rightarrow$ ; $\langle\text{STMT}\rangle$ $\langle\text{STMT\_NEXT}\rangle$ & Príkazy oddelené bodkočiarkou. \\
-34 & $\langle\text{STMT\_NEXT}\rangle$ & $\rightarrow$ $\varepsilon$ & Koniec postupnosti príkazov; príkaz smie nasledovať priamo za blokom bez oddeľovača. \\
-35 & $\langle\text{STMT}\rangle$ & $\rightarrow$ val id $\langle\text{D\_TYPE}\rangle$ = $\langle\text{EXP}\rangle$ & Nemenná premenná. \\
-36 & $\langle\text{STMT}\rangle$ & $\rightarrow$ var id $\langle\text{D\_TYPE}\rangle$ = $\langle\text{EXP}\rangle$ & Menná premenná. \\
-37 & $\langle\text{STMT}\rangle$ & $\rightarrow$ while $\langle\text{EXP}\rangle$ do EOL INDENT $\langle\text{F\_BODY}\rangle$ DEDENT & Cyklus \texttt{while}. \\
-38 & $\langle\text{STMT}\rangle$ & $\rightarrow$ return $\langle\text{RET\_VAL}\rangle$ & Návrat z funkcie. \\
-39 & $\langle\text{STMT}\rangle$ & $\rightarrow$ $\langle\text{EXP}\rangle$ & Výraz ako príkaz (napr. volanie funkcie). \\
-40 & $\langle\text{STMT}\rangle$ & $\rightarrow$ $\langle\text{EXP}\rangle$ = $\langle\text{EXP}\rangle$ & Priradenie; ľavá strana musí byť identifikátor. \\
-41 & $\langle\text{RET\_VAL}\rangle$ & $\rightarrow$ $\langle\text{EXP}\rangle$ & Návrat s hodnotou. \\
-42 & $\langle\text{RET\_VAL}\rangle$ & $\rightarrow$ $\varepsilon$ & Návrat bez hodnoty. \\
-48 & $\langle\text{STMT}\rangle$ & $\rightarrow$ $\langle\text{IF\_STMT}\rangle$ & Podmienený príkaz. \\
-49 & $\langle\text{IF\_STMT}\rangle$ & $\rightarrow$ if $\langle\text{EXP}\rangle$ [then] ( EOL INDENT $\langle\text{F\_BODY}\rangle$ DEDENT $\mid$ $\langle\text{STMT}\rangle$ ) $\langle\text{IF\_NEXT}\rangle$ & Vetva \texttt{then} ako blok alebo jeden príkaz. \\
-50 & $\langle\text{IF\_NEXT}\rangle$ & $\rightarrow$ else $\langle\text{ELSE\_NEXT}\rangle$ & Vetva \texttt{else}. \\
-51 & $\langle\text{IF\_NEXT}\rangle$ & $\rightarrow$ $\varepsilon$ & Bez \texttt{else}. \\
-52 & $\langle\text{ELSE\_NEXT}\rangle$ & $\rightarrow$ $\langle\text{IF\_STMT}\rangle$ & Reťazenie \texttt{else if}. \\
-53 & $\langle\text{ELSE\_NEXT}\rangle$ & $\rightarrow$ EOL INDENT $\langle\text{F\_BODY}\rangle$ DEDENT $\mid$ $\langle\text{STMT}\rangle$ & Blok alebo jeden príkaz. \\
-54 & $\langle\text{IF\_CONTROL}\rangle$ & $\rightarrow$ if $\langle\text{EXP}\rangle$ [then] $\langle\text{IF\_CTRL\_NEXT}\rangle$ else $\langle\text{IF\_CTRL\_NEXT}\rangle$ & \texttt{if} ako výraz; \texttt{else} je povinný. \\
-55 & $\langle\text{IF\_CTRL\_NEXT}\rangle$ & $\rightarrow$ $\langle\text{EXP}\rangle$ & Vetva tvorená výrazom. \\
-56 & $\langle\text{IF\_CTRL\_NEXT}\rangle$ & $\rightarrow$ EOL INDENT $\langle\text{F\_BODY}\rangle$ DEDENT & Vetva tvorená blokom. \\
-57 & $\langle\text{STMT}\rangle$ & $\rightarrow$ for $\langle\text{FOR\_CONTENT}\rangle$ & Cyklus \texttt{for}. \\
-59 & $\langle\text{FOR\_CONTENT}\rangle$ & $\rightarrow$ $\langle\text{GENERATOR}\rangle$ $\langle\text{OPT\_GUARDS}\rangle$ do $\langle\text{FOR\_BODY}\rangle$ & Jednoriadková hlavička. \\
-60 & $\langle\text{FOR\_CONTENT}\rangle$ & $\rightarrow$ EOL INDENT $\langle\text{GENERATOR}\rangle$ $\langle\text{EOL\_GUARDS}\rangle$ DEDENT do $\langle\text{FOR\_BODY}\rangle$ & Viacriadková hlavička. \\
-61 & $\langle\text{GENERATOR}\rangle$ & $\rightarrow$ id <- $\langle\text{EXP}\rangle$ $\langle\text{RANGE}\rangle$ $\langle\text{EXP}\rangle$ $\langle\text{OPT\_STEP}\rangle$ & Generátor hodnôt. \\
-62, 63 & $\langle\text{RANGE}\rangle$ & $\rightarrow$ to $\mid$ until & Horná hranica vrátane / bez nej. \\
-64 & $\langle\text{OPT\_STEP}\rangle$ & $\rightarrow$ by $\langle\text{EXP}\rangle$ & Krok. \\
-65 & $\langle\text{OPT\_STEP}\rangle$ & $\rightarrow$ $\varepsilon$ & Bez kroku. \\
-66 & $\langle\text{OPT\_GUARDS}\rangle$ & $\rightarrow$ if $\langle\text{EXP}\rangle$ $\langle\text{OPT\_GUARDS}\rangle$ & Stráž cyklu. \\
-67 & $\langle\text{OPT\_GUARDS}\rangle$ & $\rightarrow$ $\varepsilon$ & Bez stráží. \\
-68 & $\langle\text{EOL\_GUARDS}\rangle$ & $\rightarrow$ EOL if $\langle\text{EXP}\rangle$ $\langle\text{EOL\_GUARDS}\rangle$ & Stráž na samostatnom riadku. \\
-69 & $\langle\text{EOL\_GUARDS}\rangle$ & $\rightarrow$ $\varepsilon$ & Bez ďalších stráží. \\
-70 & $\langle\text{FOR\_BODY}\rangle$ & $\rightarrow$ $\langle\text{STMT}\rangle$ & Telo cyklu jedným príkazom. \\
-71 & $\langle\text{FOR\_BODY}\rangle$ & $\rightarrow$ EOL INDENT $\langle\text{F\_BODY}\rangle$ DEDENT & Telo cyklu blokom. \\
+
+\multicolumn{3}{l}{\textbf{1. Prolog a funkcie}} \\[2pt]
+1 & $\langle\text{PROLOG}\rangle$ & $\rightarrow$ \texttt{import} \texttt{ifj26.*} \texttt{EOL} $\langle\text{F\_List}\rangle$ \texttt{EOF} \\
+2 & $\langle\text{F\_List}\rangle$ & $\rightarrow$ $\langle\text{F\_def}\rangle$ $\langle\text{F\_List}\rangle$ \\
+3 & $\langle\text{F\_List}\rangle$ & $\rightarrow$ \texttt{extension} $\langle\text{EXTENSION}\rangle$ $\langle\text{F\_List}\rangle$ \\
+4 & $\langle\text{F\_List}\rangle$ & $\rightarrow$ $\varepsilon$ \\
+5 & $\langle\text{F\_def}\rangle$ & $\rightarrow$ $\langle\text{ANOTACIA}\rangle$ \texttt{def} \texttt{id} $\langle\text{PARAM\_LISTS}\rangle$ \\
+ & & \hspace{1.2em}$\langle\text{D\_TYPE}\rangle$ \texttt{=} $\langle\text{F\_BODY\_END}\rangle$ \\
+6 & $\langle\text{PARAM\_LISTS}\rangle$ & $\rightarrow$ \texttt{(} $\langle\text{PARAMETER}\rangle$ \texttt{)} $\langle\text{PARAM\_LISTS}\rangle$ \\
+7 & $\langle\text{PARAM\_LISTS}\rangle$ & $\rightarrow$ $\varepsilon$ \\
+8 & $\langle\text{F\_BODY\_END}\rangle$ & $\rightarrow$ \texttt{EOL} \texttt{INDENT} $\langle\text{F\_BODY}\rangle$ \texttt{DEDENT} \\
+9 & $\langle\text{F\_BODY\_END}\rangle$ & $\rightarrow$ $\langle\text{VAL}\rangle$ \texttt{EOL} \\
+10 & $\langle\text{ANOTACIA}\rangle$ & $\rightarrow$ \texttt{@main} $\langle\text{NEW\_LINE}\rangle$ \\
+11 & $\langle\text{ANOTACIA}\rangle$ & $\rightarrow$ $\varepsilon$ \\
+12 & $\langle\text{NEW\_LINE}\rangle$ & $\rightarrow$ \texttt{EOL} \\
+13 & $\langle\text{NEW\_LINE}\rangle$ & $\rightarrow$ $\varepsilon$ \\
+\midrule
+\multicolumn{3}{l}{\textbf{2. Extension}} \\[2pt]
+14 & $\langle\text{EXTENSION}\rangle$ & $\rightarrow$ \texttt{(} \texttt{id} \texttt{:} $\langle\text{TYPE}\rangle$ \texttt{)} \texttt{EOL} \texttt{INDENT} $\langle\text{E\_BODY}\rangle$ \texttt{DEDENT} \\
+15 & $\langle\text{E\_BODY}\rangle$ & $\rightarrow$ \texttt{def} \texttt{id} $\langle\text{PARAM\_LISTS}\rangle$ $\langle\text{D\_TYPE}\rangle$ \\
+ & & \hspace{1.2em}\texttt{=} $\langle\text{F\_BODY\_END}\rangle$ $\langle\text{EB\_NEXT}\rangle$ \\
+16 & $\langle\text{EB\_NEXT}\rangle$ & $\rightarrow$ $\langle\text{E\_BODY}\rangle$ \\
+17 & $\langle\text{EB\_NEXT}\rangle$ & $\rightarrow$ $\varepsilon$ \\
+\midrule
+\multicolumn{3}{l}{\textbf{3. Typy a parametre}} \\[2pt]
+18 & $\langle\text{D\_TYPE}\rangle$ & $\rightarrow$ \texttt{:} $\langle\text{TYPE}\rangle$ \\
+19 & $\langle\text{D\_TYPE}\rangle$ & $\rightarrow$ $\varepsilon$ \\
+20 & $\langle\text{TYPE}\rangle$ & $\rightarrow$ \texttt{Int} \\
+21 & $\langle\text{TYPE}\rangle$ & $\rightarrow$ \texttt{Double} \\
+22 & $\langle\text{TYPE}\rangle$ & $\rightarrow$ \texttt{String} \\
+23 & $\langle\text{TYPE}\rangle$ & $\rightarrow$ \texttt{Unit} \\
+24 & $\langle\text{TYPE}\rangle$ & $\rightarrow$ \texttt{Boolean} \\
+25 & $\langle\text{PARAMETER}\rangle$ & $\rightarrow$ \texttt{id} \texttt{:} $\langle\text{TYPE}\rangle$ $\langle\text{PARAM\_NEXT}\rangle$ \\
+26 & $\langle\text{PARAMETER}\rangle$ & $\rightarrow$ $\varepsilon$ \\
+27 & $\langle\text{PARAM\_NEXT}\rangle$ & $\rightarrow$ \texttt{,} $\langle\text{PARAM\_TAIL}\rangle$ \\
+28 & $\langle\text{PARAM\_NEXT}\rangle$ & $\rightarrow$ $\varepsilon$ \\
+29 & $\langle\text{PARAM\_TAIL}\rangle$ & $\rightarrow$ \texttt{id} \texttt{:} $\langle\text{TYPE}\rangle$ $\langle\text{PARAM\_NEXT}\rangle$ \\
+30 & $\langle\text{PARAM\_TAIL}\rangle$ & $\rightarrow$ $\varepsilon$ \\
+\midrule
+\multicolumn{3}{l}{\textbf{4. Telo a príkazy}} \\[2pt]
+31 & $\langle\text{F\_BODY}\rangle$ & $\rightarrow$ $\langle\text{STMT}\rangle$ $\langle\text{STMT\_NEXT}\rangle$ \\
+32 & $\langle\text{STMT\_NEXT}\rangle$ & $\rightarrow$ \texttt{EOL} $\langle\text{STMT}\rangle$ $\langle\text{STMT\_NEXT}\rangle$ \\
+33 & $\langle\text{STMT\_NEXT}\rangle$ & $\rightarrow$ \texttt{;} $\langle\text{STMT}\rangle$ $\langle\text{STMT\_NEXT}\rangle$ \\
+34 & $\langle\text{STMT\_NEXT}\rangle$ & $\rightarrow$ $\varepsilon$ \\
+35 & $\langle\text{STMT}\rangle$ & $\rightarrow$ \texttt{val} \texttt{id} $\langle\text{D\_TYPE}\rangle$ \texttt{=} $\langle\text{VAL}\rangle$ \\
+36 & $\langle\text{STMT}\rangle$ & $\rightarrow$ \texttt{var} \texttt{id} $\langle\text{D\_TYPE}\rangle$ \texttt{=} $\langle\text{VAL}\rangle$ \\
+37 & $\langle\text{STMT}\rangle$ & $\rightarrow$ \texttt{while} $\langle\text{EXP}\rangle$ \texttt{do} \texttt{EOL} \texttt{INDENT} $\langle\text{F\_BODY}\rangle$ \texttt{DEDENT} \\
+38 & $\langle\text{STMT}\rangle$ & $\rightarrow$ \texttt{return} $\langle\text{RET\_VAL}\rangle$ \\
+39 & $\langle\text{STMT}\rangle$ & $\rightarrow$ \texttt{id} $\langle\text{DEC}\rangle$ \\
+40 & $\langle\text{STMT}\rangle$ & $\rightarrow$ $\langle\text{OTHER\_EXP}\rangle$ \\
+\midrule
+\multicolumn{3}{l}{\textbf{5. Hodnoty a volania}} \\[2pt]
+41 & $\langle\text{RET\_VAL}\rangle$ & $\rightarrow$ $\langle\text{VAL}\rangle$ \\
+42 & $\langle\text{RET\_VAL}\rangle$ & $\rightarrow$ $\varepsilon$ \\
+43 & $\langle\text{DEC}\rangle$ & $\rightarrow$ \texttt{=} $\langle\text{VAL}\rangle$ \\
+44 & $\langle\text{DEC}\rangle$ & $\rightarrow$ $\langle\text{EXP\_CONT}\rangle$ \\
+45 & $\langle\text{DEC}\rangle$ & $\rightarrow$ $\varepsilon$ \\
+\midrule
+\multicolumn{3}{l}{\textbf{6. Hodnota}} \\[2pt]
+46 & $\langle\text{VAL}\rangle$ & $\rightarrow$ $\langle\text{EXP}\rangle$ \\
+47 & $\langle\text{VAL}\rangle$ & $\rightarrow$ $\langle\text{IF\_CONTROL}\rangle$ \\
+\midrule
+\multicolumn{3}{l}{\textbf{7. If ako príkaz}} \\[2pt]
+48 & $\langle\text{STMT}\rangle$ & $\rightarrow$ $\langle\text{IF\_STMT\_ALL}\rangle$ \\
+49 & $\langle\text{IF\_STMT\_ALL}\rangle$ & $\rightarrow$ \texttt{if} $\langle\text{EXP}\rangle$ \texttt{then} \texttt{EOL} \texttt{INDENT} $\langle\text{F\_BODY}\rangle$ \\
+ & & \hspace{1.2em}\texttt{DEDENT} $\langle\text{IF\_NEXT}\rangle$ \\
+50 & $\langle\text{IF\_NEXT}\rangle$ & $\rightarrow$ \texttt{else} $\langle\text{ELSE\_NEXT}\rangle$ \\
+51 & $\langle\text{IF\_NEXT}\rangle$ & $\rightarrow$ $\varepsilon$ \\
+52 & $\langle\text{ELSE\_NEXT}\rangle$ & $\rightarrow$ $\langle\text{IF\_STMT\_ALL}\rangle$ \\
+53 & $\langle\text{ELSE\_NEXT}\rangle$ & $\rightarrow$ \texttt{EOL} \texttt{INDENT} $\langle\text{F\_BODY}\rangle$ \texttt{DEDENT} \\
+\midrule
+\multicolumn{3}{l}{\textbf{8. If ako výraz}} \\[2pt]
+54 & $\langle\text{IF\_CONTROL}\rangle$ & $\rightarrow$ \texttt{if} $\langle\text{EXP}\rangle$ \texttt{then} $\langle\text{IF\_CONTROL\_NEXT}\rangle$ \\
+ & & \hspace{1.2em}\texttt{else} $\langle\text{IF\_CONTROL\_NEXT}\rangle$ \\
+55 & $\langle\text{IF\_CONTROL\_NEXT}\rangle$ & $\rightarrow$ $\langle\text{VAL}\rangle$ \\
+56 & $\langle\text{IF\_CONTROL\_NEXT}\rangle$ & $\rightarrow$ \texttt{EOL} \texttt{INDENT} $\langle\text{F\_BODY}\rangle$ \texttt{DEDENT} \\
+\midrule
+\multicolumn{3}{l}{\textbf{9. For cyklus}} \\[2pt]
+57 & $\langle\text{STMT}\rangle$ & $\rightarrow$ $\langle\text{FOR\_STMT}\rangle$ \\
+58 & $\langle\text{FOR\_STMT}\rangle$ & $\rightarrow$ \texttt{for} $\langle\text{FOR\_CONTENT}\rangle$ \\
+59 & $\langle\text{FOR\_CONTENT}\rangle$ & $\rightarrow$ $\langle\text{GENERATOR}\rangle$ $\langle\text{OPT\_GUARDS}\rangle$ \texttt{do} $\langle\text{FOR\_BODY}\rangle$ \\
+60 & $\langle\text{FOR\_CONTENT}\rangle$ & $\rightarrow$ \texttt{EOL} \texttt{INDENT} $\langle\text{GENERATOR}\rangle$ $\langle\text{EOL\_GUARDS}\rangle$ \\
+ & & \hspace{1.2em}\texttt{DEDENT} \texttt{do} $\langle\text{FOR\_BODY}\rangle$ \\
+61 & $\langle\text{GENERATOR}\rangle$ & $\rightarrow$ \texttt{id} \texttt{<-} $\langle\text{EXP}\rangle$ $\langle\text{RANGE}\rangle$ $\langle\text{EXP}\rangle$ $\langle\text{OPT\_STEP}\rangle$ \\
+62 & $\langle\text{RANGE}\rangle$ & $\rightarrow$ \texttt{to} \\
+63 & $\langle\text{RANGE}\rangle$ & $\rightarrow$ \texttt{until} \\
+64 & $\langle\text{OPT\_STEP}\rangle$ & $\rightarrow$ \texttt{by} $\langle\text{EXP}\rangle$ \\
+65 & $\langle\text{OPT\_STEP}\rangle$ & $\rightarrow$ $\varepsilon$ \\
+66 & $\langle\text{OPT\_GUARDS}\rangle$ & $\rightarrow$ \texttt{if} $\langle\text{EXP}\rangle$ $\langle\text{OPT\_GUARDS}\rangle$ \\
+67 & $\langle\text{OPT\_GUARDS}\rangle$ & $\rightarrow$ $\varepsilon$ \\
+68 & $\langle\text{EOL\_GUARDS}\rangle$ & $\rightarrow$ \texttt{EOL} \texttt{if} $\langle\text{EXP}\rangle$ $\langle\text{EOL\_GUARDS}\rangle$ \\
+69 & $\langle\text{EOL\_GUARDS}\rangle$ & $\rightarrow$ $\varepsilon$ \\
+70 & $\langle\text{FOR\_BODY}\rangle$ & $\rightarrow$ $\langle\text{STMT}\rangle$ \\
+71 & $\langle\text{FOR\_BODY}\rangle$ & $\rightarrow$ \texttt{EOL} \texttt{INDENT} $\langle\text{F\_BODY}\rangle$ \texttt{DEDENT} \\
 \end{longtable}
 \normalsize
 
-\noindent Čísla pravidiel zodpovedajú komentárom v zdrojovom kóde \texttt{parser.c}. Pravidlá 43--47 pôvodnej verzie (neterminály \texttt{VAL}, \texttt{DEC}, \texttt{ARG}, \texttt{TERM}) zanikli, pretože ich nahradil precedenčný analyzátor výrazov, ktorý spracúva aj volania funkcií.
 
 \subsection{Spracovanie výrazov (precedenčná syntaktická analýza)}
 \label{sec:expr}

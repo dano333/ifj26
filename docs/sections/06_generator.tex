@@ -38,5 +38,3 @@ Generátor prideľuje každému vetveniu alebo cyklu unikátne číselné ID (\t
 
 \subsection{Runtime vstavaných funkcií}
 Reťazec \texttt{RUNTIME} definuje inštrukcie \texttt{IFJcode26} pre vstavané funkcie jazyka IFJ26: \texttt{\$ifj\_print} (hodnotu \texttt{nil} vypisuje jako \texttt{()}), \texttt{\$ifj\_toStr} (prevádza \texttt{int}, \texttt{float}, \texttt{bool}, \texttt{string} a \texttt{nil} $\rightarrow$ \texttt{()}), \texttt{\$ifj\_readLine}, \texttt{\$ifj\_readInt}, \texttt{\$ifj\_readDouble}, \texttt{\$ifj\_readBoolean} (pri \texttt{nil}/EOF vracajú predvolené hodnoty \texttt{""}, \texttt{0}, \texttt{0.0}, resp. \texttt{false}), \texttt{\$ifj\_strLength}, \texttt{\$ifj\_ord} (mimo rozsahu vracia~\texttt{-1}), \texttt{\$ifj\_chr}, \texttt{\$ifj\_subStr} (neplatný rozsah končí \texttt{EXIT int@40}), \texttt{\$ifj\_toInt} a \texttt{\$ifj\_floor}.
-
-\end{document}
