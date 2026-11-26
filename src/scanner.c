@@ -185,6 +185,8 @@ ErrorCode get_token(Token *token, Scanner *scanner) {
 	if (scanner->pending_dedents > 0) {
 		scanner->pending_dedents--;
 		token->type = TOKEN_DEDENT;
+		token->line = scanner->line;
+		token->column = scanner->column;
 		return ERR_OK;
 	}
 
