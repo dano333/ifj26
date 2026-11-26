@@ -38,5 +38,3 @@ Generátor přiděluje každému větvení nebo cyklu unikátní číselné ID (
 
 \subsection{Runtime vestavěných funkcí}
 Řetězec \texttt{RUNTIME} definuje instrukce \texttt{IFJcode26} pro vestavěné funkce jazyka IFJ26: \texttt{\$ifj\_print} (hodnotu \texttt{nil} vypisuje jako \texttt{()}), \texttt{\$ifj\_toStr} (převádí \texttt{int}, \texttt{float}, \texttt{bool}, \texttt{string} a \texttt{nil} $\rightarrow$ \texttt{()}), \texttt{\$ifj\_readLine}, \texttt{\$ifj\_readInt}, \texttt{\$ifj\_readDouble}, \texttt{\$ifj\_readBoolean} (při \texttt{nil}/EOF vracejí výchozí hodnoty \texttt{""}, \texttt{0}, \texttt{0.0}, resp. \texttt{false}), \texttt{\$ifj\_strLength}, \texttt{\$ifj\_ord} (mimo rozsah vrací \texttt{-1}), \texttt{\$ifj\_chr}, \texttt{\$ifj\_subStr} (neplatný rozsah končí \texttt{EXIT int@40}), \texttt{\$ifj\_toInt} a \texttt{\$ifj\_floor}.
-
-\end{document}
