@@ -1,3 +1,9 @@
+/*
+ * Project: IFJ26
+ * Authors: Nazar Zhyla (xzhylan00)
+ * Description: AST
+ */
+
 #include "ast.h"
 #include <stdlib.h>
 #include <string.h>

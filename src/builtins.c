@@ -1,3 +1,9 @@
+/*
+ * Project: IFJ26
+ * Authors: Jakub Krčmárik (xkrcmaj00)
+ * Description: built-in functions
+ */
+
 #include "builtins.h"
 #include <stdarg.h>
 #include <stdbool.h>
