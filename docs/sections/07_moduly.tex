@@ -15,5 +15,5 @@ Kompletný zoznam zdrojových súborov prekladača:
 
 \subsection{Závislosti modulov}
 \begin{center}
-\texttt{main} $\rightarrow$ \{ \texttt{parser}, \texttt{generator} \}; \quad \texttt{parser} $\rightarrow$ \{ \texttt{scanner}, \texttt{expr}, \texttt{semantics}, \texttt{ast}, \texttt{symtable} \}; \quad \texttt{generator} $\rightarrow$ \texttt{ast}; \quad \texttt{expr} $\rightarrow$ \{ \texttt{parser} (\texttt{compare\_token}, \texttt{if\_control}), \texttt{semantics}, \texttt{ast} \}; \quad \texttt{semantics} $\rightarrow$ \texttt{symtable}; \quad \texttt{builtins} $\rightarrow$ \texttt{symtable}.
+\texttt{main} $\rightarrow$ \{ \texttt{scanner}, \texttt{parser}, \texttt{symtable}, \texttt{builtins}, \texttt{generator} \}; \quad \texttt{scanner} $\rightarrow$ \{ \texttt{indent\_stack}, \texttt{string\_buffer} \}; \quad \texttt{parser} $\rightarrow$ \{ \texttt{scanner}, \texttt{expr}, \texttt{semantics}, \texttt{ast}, \texttt{symtable} \}; \quad \texttt{generator} $\rightarrow$ \texttt{ast}; \quad \texttt{expr} $\rightarrow$ \{ \texttt{parser} (\texttt{compare\_token}, \texttt{if\_control}), \texttt{semantics}, \texttt{ast} \}; \quad \texttt{semantics} $\rightarrow$ \texttt{symtable}; \quad \texttt{builtins} $\rightarrow$ \texttt{symtable}.
 \end{center}
