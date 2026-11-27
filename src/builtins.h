@@ -1,3 +1,9 @@
+/*
+ * Project: IFJ26
+ * Authors: Jakub Krčmárik (xkrcmaj00)
+ * Description: built-in functions
+ */
+
 #ifndef BUILTINS_H
 #define BUILTINS_H
 
